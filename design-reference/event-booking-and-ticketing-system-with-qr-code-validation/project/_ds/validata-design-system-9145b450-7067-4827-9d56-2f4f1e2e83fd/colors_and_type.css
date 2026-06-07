@@ -1,0 +1,89 @@
+/* ============================================================
+   Validata — Lab Results Validator
+   Foundational design tokens: color + type
+   Load AFTER the Google Fonts link (Poppins / Inter / JetBrains Mono)
+   ============================================================ */
+
+/* ---- Fonts (Google Fonts — exact match to source design) ----
+   <link rel="preconnect" href="https://fonts.googleapis.com">
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+*/
+
+:root {
+  /* ---------- Brand & accent ---------- */
+  --orange:            #FF5A00;   /* primary action, active states, badges, logo */
+  --orange-deep:       #A83900;   /* icon-on-tint, pressed accents, dark text on light orange */
+  --orange-hover:      #E85100;   /* primary button hover */
+  --orange-press:      #CC4800;   /* primary button active */
+  --navy:              #08283B;   /* sidebar, table headers, dark surfaces */
+  --navy-2:            #0F3349;   /* navy elevated / hover row in nav */
+
+  /* ---------- Neutrals / structure ---------- */
+  --bg:                #F7F6F2;   /* app page background (off-white) */
+  --surface:           #FFFFFF;   /* cards, modals, table rows, inputs */
+  --surface-alt:       #FFF8F6;   /* warm tint surface (report bg, zebra) */
+  --border:            #E2E0D8;   /* dividers, input + card borders */
+  --border-soft:       rgba(226,224,216,0.5); /* inner hairlines */
+
+  /* ---------- Text ---------- */
+  --text:              #0F1A20;   /* headings + body */
+  --text-secondary:    #5A6870;   /* labels, captions, helper, secondary */
+  --text-muted:        #6B7280;   /* placeholder / disabled-ish */
+  --text-on-dark:      #FFFFFF;
+  --text-on-dark-dim:  rgba(255,255,255,0.7);  /* idle nav label */
+  --text-on-dark-faint:rgba(255,255,255,0.6);  /* "Internal Tool" subtitle */
+
+  /* ---------- Semantic status ---------- */
+  --success:           #1A6B3C;   --success-bg: #EAF3DE;
+  --danger:            #A32D2D;   --danger-bg:  #FCEBEB;
+  --warning:           #7A4A00;   --warning-bg: #FDF0D5;
+  --info:              #466177;   --info-bg:    #CAE6FF;   /* blue/secondary accent */
+
+  /* Stat-card icon chips */
+  --chip-orange-bg:    #FFE9E3;   --chip-orange-fg: #A83900;
+  --chip-blue-bg:      #CAE6FF;   --chip-blue-fg:   #08283B;
+  --chip-amber-bg:     #FDF0D5;   --chip-amber-fg:  #7A4A00;
+
+  /* ---------- Type families ---------- */
+  --font-display: "Poppins", "Helvetica Neue", Arial, sans-serif;  /* headings — semibold/bold */
+  --font-body:    "Inter", system-ui, -apple-system, sans-serif;   /* body + UI */
+  --font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace; /* row #, rule IDs, file names, hashes */
+
+  /* ---------- Radii ---------- */
+  --r-sm:   2px;   /* inputs, buttons, stat-card icon chips (source uses tight radii) */
+  --r-md:   6px;   /* cards (per spec) */
+  --r-lg:   8px;   /* large surfaces / modal */
+  --r-pill: 9999px;/* status pills, avatar */
+
+  /* ---------- Shadow / elevation ---------- */
+  --shadow-card:  0px 1px 2px 0px rgba(0,0,0,0.05);   /* card / input resting */
+  --shadow-stat:  0px 2px 4px 0px rgba(0,0,0,0.02);   /* very soft stat card */
+  --shadow-pop:   0px 8px 24px -6px rgba(8,40,59,0.18); /* menus, drawers, modals */
+  --ring-focus:   0 0 0 3px rgba(255,90,0,0.30);      /* focus ring */
+
+  /* ---------- Spacing / layout ---------- */
+  --sidebar-w:   220px;
+  --topbar-h:    56px;
+  --container-max: 1100px;
+  --gutter:      32px;
+  --stack-sm:    8px;
+  --stack-md:    16px;
+  --stack-lg:    24px;
+}
+
+/* ============================================================
+   Semantic type scale  (apply as classes or copy the rules)
+   ============================================================ */
+
+.t-display-lg { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-height: 40px; letter-spacing: -0.8px; color: var(--text); }
+.t-display-md { font-family: var(--font-display); font-weight: 700; font-size: 24px; line-height: 32px; letter-spacing: -0.6px; color: var(--text); }
+.t-headline   { font-family: var(--font-display); font-weight: 600; font-size: 18px; line-height: 24px; color: var(--text); }
+.t-stat       { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-height: 32px; color: var(--text); } /* big KPI numbers */
+
+.t-body-lg    { font-family: var(--font-body); font-weight: 400; font-size: 16px; line-height: 24px; color: var(--text); }
+.t-body       { font-family: var(--font-body); font-weight: 400; font-size: 14px; line-height: 20px; color: var(--text); }
+.t-label      { font-family: var(--font-body); font-weight: 500; font-size: 12px; line-height: 16px; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-secondary); } /* eyebrow / column-ish caps */
+.t-caption    { font-family: var(--font-body); font-weight: 400; font-size: 12px; line-height: 16px; color: var(--text-secondary); }
+.t-mono       { font-family: var(--font-mono); font-weight: 400; font-size: 13px; line-height: 18px; color: var(--text); }
+.t-eyebrow    { font-family: var(--font-body); font-weight: 500; font-size: 11px; line-height: 16px; letter-spacing: 1.1px; text-transform: uppercase; color: var(--text-secondary); } /* "SECURE 256-BIT…" style */

@@ -1,0 +1,175 @@
+{
+  "plugins": [
+    "react",
+    "import"
+  ],
+  "rules": {
+    "react/forbid-elements": [
+      "warn",
+      {
+        "forbid": []
+      }
+    ],
+    "no-restricted-imports": [
+      "warn",
+      {
+        "patterns": [
+          {
+            "group": [
+              "dashboard/**",
+              "ui_kits/app/**"
+            ],
+            "message": "Import design-system components from 'index.js', not component internals."
+          }
+        ]
+      }
+    ],
+    "no-restricted-syntax": [
+      "warn",
+      {
+        "selector": "Literal[value=/#[0-9a-fA-F]{3,8}\\b/]",
+        "message": "Raw hex color — use a design-system color token via var()."
+      },
+      {
+        "selector": "Literal[value=/\\b\\d+px\\b/]",
+        "message": "Raw px value — use a design-system spacing token via var()."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "**/index.js"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ],
+  "x-omelette": {
+    "components": {},
+    "tokens": [
+      "--bg",
+      "--border",
+      "--border-soft",
+      "--chip-amber-bg",
+      "--chip-amber-fg",
+      "--chip-blue-bg",
+      "--chip-blue-fg",
+      "--chip-orange-bg",
+      "--chip-orange-fg",
+      "--container-max",
+      "--critical",
+      "--danger",
+      "--danger-bg",
+      "--font-body",
+      "--font-display",
+      "--font-mono",
+      "--gold",
+      "--good",
+      "--gutter",
+      "--info",
+      "--info-bg",
+      "--ink",
+      "--muted",
+      "--navy",
+      "--navy-2",
+      "--norev",
+      "--orange",
+      "--orange-deep",
+      "--orange-hover",
+      "--orange-press",
+      "--r-lg",
+      "--r-md",
+      "--r-pill",
+      "--r-sm",
+      "--radius",
+      "--ring-focus",
+      "--row-alt",
+      "--shadow-card",
+      "--shadow-hover",
+      "--shadow-pop",
+      "--shadow-stat",
+      "--sidebar-w",
+      "--stack-lg",
+      "--stack-md",
+      "--stack-sm",
+      "--success",
+      "--success-bg",
+      "--surface",
+      "--surface-alt",
+      "--text",
+      "--text-muted",
+      "--text-on-dark",
+      "--text-on-dark-dim",
+      "--text-on-dark-faint",
+      "--text-secondary",
+      "--topbar-h",
+      "--warning",
+      "--warning-bg",
+      "--white"
+    ],
+    "tokenKinds": {
+      "--orange": "color",
+      "--orange-deep": "color",
+      "--orange-hover": "color",
+      "--orange-press": "color",
+      "--navy": "color",
+      "--navy-2": "color",
+      "--bg": "color",
+      "--surface": "color",
+      "--surface-alt": "color",
+      "--border": "color",
+      "--border-soft": "color",
+      "--text": "font",
+      "--text-secondary": "font",
+      "--text-muted": "font",
+      "--text-on-dark": "font",
+      "--text-on-dark-dim": "font",
+      "--text-on-dark-faint": "font",
+      "--success": "color",
+      "--success-bg": "color",
+      "--danger": "color",
+      "--danger-bg": "color",
+      "--warning": "color",
+      "--warning-bg": "color",
+      "--info": "color",
+      "--info-bg": "color",
+      "--chip-orange-bg": "color",
+      "--chip-orange-fg": "color",
+      "--chip-blue-bg": "color",
+      "--chip-blue-fg": "color",
+      "--chip-amber-bg": "color",
+      "--chip-amber-fg": "color",
+      "--font-display": "font",
+      "--font-body": "font",
+      "--font-mono": "font",
+      "--r-sm": "spacing",
+      "--r-md": "spacing",
+      "--r-lg": "spacing",
+      "--r-pill": "spacing",
+      "--shadow-card": "shadow",
+      "--shadow-stat": "shadow",
+      "--shadow-pop": "shadow",
+      "--ring-focus": "shadow",
+      "--sidebar-w": "spacing",
+      "--topbar-h": "spacing",
+      "--container-max": "spacing",
+      "--gutter": "spacing",
+      "--stack-sm": "spacing",
+      "--stack-md": "spacing",
+      "--stack-lg": "spacing",
+      "--gold": "color",
+      "--white": "color",
+      "--ink": "color",
+      "--muted": "color",
+      "--good": "color",
+      "--critical": "color",
+      "--norev": "color",
+      "--row-alt": "color",
+      "--radius": "radius",
+      "--shadow-hover": "shadow"
+    },
+    "fontFamilies": []
+  }
+}

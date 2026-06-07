@@ -1,0 +1,26 @@
+/* Shared styles for Design System specimen cards.
+   Each card is a standalone HTML file ~700px wide; the asset name
+   is rendered OUTSIDE the card by the DS tab, so cards carry no titles. */
+@import url("../colors_and_type.css");
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: var(--font-body);
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  padding: 20px;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+}
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.col { display: flex; flex-direction: column; }
+.muted { color: var(--text-secondary); }
+.mono { font-family: var(--font-mono); }
+.cap  { font-size: 11px; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-secondary); font-weight: 500; }
