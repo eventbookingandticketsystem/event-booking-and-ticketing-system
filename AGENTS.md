@@ -44,7 +44,7 @@ _looks like_, not how it was coded.
 
 - **Name:** Tiketi
 - **Tagline:** Event booking & ticketing for South Sudan
-- **Stack:** Next.js 15 App Router · TypeScript strict · Tailwind CSS ·
+- **Stack:** Next.js App Router · TypeScript strict · Tailwind CSS ·
   shadcn/ui · React Hook Form + Zod · Lucide React · qrcode npm
 - **Data:** Static mock data only — no backend, no API calls, no database
 - **Context:** South Sudan (Juba) — SSP currency, +211 phones,
