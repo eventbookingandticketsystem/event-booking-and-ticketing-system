@@ -50,6 +50,7 @@ export interface ExploreEventType {
   time: string;
   about: string;
   tiers: ExploreTier[];
+  image?: string;        // optional photo URL (Unsplash etc.)
 }
 
 // Organizer events table row (ORG_EVENTS)

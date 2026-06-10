@@ -28,12 +28,25 @@ export function ExploreCard({ event, fixed = false, onClick, className }: Explor
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange",
         "scroll-snap-align-start",
         fixed ? "flex-none w-[248px]" : "w-full",
-        // aspect-ratio 3:4 via aspect-[3/4]
         "aspect-[3/4]",
         className,
       )}
-      style={{ backgroundImage: poster, backgroundSize: "cover", backgroundPosition: "center" }}
+      // gradient poster is the fallback background colour
+      style={{ background: poster }}
     >
+      {/* Photo layer — rendered as <img> so Next.js doesn't complain about external URLs */}
+      {event.image && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={event.image}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover object-center"
+          loading="lazy"
+          decoding="async"
+        />
+      )}
+
       {/* Subtle grid pattern overlay */}
       <div
         className="absolute inset-0 pointer-events-none"

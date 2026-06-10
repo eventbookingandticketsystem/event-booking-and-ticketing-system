@@ -341,6 +341,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     price: 500, status: "happening-now", times: ["happening-now", "today"], sortKey: 1,
     organizer: "Nile Live Events", date: "Today", time: "18:00 – 23:00",
     about: "The biggest night of live music in South Sudan. Three stages, fifteen artists, and food vendors from across Juba. Gates open at 17:00.",
+    image: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=600&q=80",
     tiers: [
       { id: "vip", name: "VIP",     price: 2500, remaining: 40   },
       { id: "gen", name: "General", price: 500,  remaining: 1200 },
@@ -351,6 +352,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     price: 200, status: "happening-now", times: ["happening-now", "today"], sortKey: 2,
     organizer: "SSFA", date: "Today", time: "16:00 kick-off",
     about: "The title decider. Defending champions face the league's top scorers. Turnstiles open two hours before kick-off.",
+    image: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=600&q=80",
     tiers: [
       { id: "vip", name: "VIP Stand",     price: 800, remaining: 60   },
       { id: "gen", name: "General Stand", price: 200, remaining: 3400 },
@@ -361,6 +363,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     price: 0, status: "happening-now", times: ["happening-now", "today", "weekend"], sortKey: 3,
     organizer: "Juba Cathedral", date: "Today", time: "10:00 – 13:00",
     about: "An open celebration of worship and gospel music. All are welcome. Free entry, seating first-come.",
+    image: "https://images.unsplash.com/photo-1529154036614-a60975f5c760?w=600&q=80",
     tiers: [{ id: "free", name: "General admission", price: 0, remaining: 800 }],
   },
   {
@@ -368,6 +371,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     price: 0, status: "upcoming", times: ["weekend", "tomorrow", "month"], sortKey: 4,
     organizer: "University of Juba", date: "Sat 21 Jun 2025", time: "09:00",
     about: "The 2025 commencement ceremony. Each graduand is allocated guest tickets. Doors close promptly at 08:45.",
+    image: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=600&q=80",
     tiers: [{ id: "fam", name: "Family Guest", price: 0, remaining: 140 }],
   },
   {
@@ -375,6 +379,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     price: 1500, status: "upcoming", times: ["month"], sortKey: 6,
     organizer: "SS Chamber of Commerce", date: "Mon 23 Jun 2025", time: "08:30 – 17:00",
     about: "A full-day gathering of founders, investors, and policymakers shaping South Sudan's economy. Includes lunch and a networking reception.",
+    image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&q=80",
     tiers: [
       { id: "del", name: "Delegate",  price: 1500, remaining: 120 },
       { id: "vip", name: "Executive", price: 4000, remaining: 30  },
@@ -385,6 +390,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     price: 300, status: "upcoming", times: ["weekend", "month"], sortKey: 7,
     organizer: "Eden Garden", date: "Fri 27 Jun 2025", time: "19:00",
     about: "An intimate evening of live jazz under the Juba sky, with food and drinks available all night.",
+    image: "https://images.unsplash.com/photo-1415201364774-f6f0bb35f28f?w=600&q=80",
     tiers: [
       { id: "gen", name: "General", price: 300,  remaining: 400 },
       { id: "vip", name: "Lounge",  price: 1200, remaining: 50  },
@@ -395,6 +401,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     price: 100, status: "upcoming", times: ["weekend", "month"], sortKey: 8,
     organizer: "SSFA", date: "Sun 29 Jun 2025", time: "15:00 kick-off",
     about: "Matchweek 24 of the South Sudan Premier League. A local derby with everything to play for.",
+    image: "https://images.unsplash.com/photo-1577223625816-7546f13df25d?w=600&q=80",
     tiers: [{ id: "gen", name: "General Stand", price: 100, remaining: 5000 }],
   },
   {
@@ -402,6 +409,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     price: 750, status: "upcoming", times: ["month"], sortKey: 9,
     organizer: "Ministry of Youth", date: "Tue 1 Jul 2025", time: "09:00 – 16:00",
     about: "Young leaders from across the ten states convene for a day of workshops, panels, and networking.",
+    image: "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=600&q=80",
     tiers: [{ id: "gen", name: "Delegate", price: 750, remaining: 300 }],
   },
   {
@@ -409,6 +417,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     price: 150, status: "upcoming", times: ["weekend", "month"], sortKey: 10,
     organizer: "AmaliTech Events", date: "Sat 5 Jul 2025", time: "12:00 – 22:00",
     about: "Fifty vendors, twelve cuisines, and live entertainment across two outdoor stages. Family-friendly, pet-friendly.",
+    image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=600&q=80",
     tiers: [
       { id: "gen", name: "General Entry", price: 150, remaining: 2000 },
       { id: "vip", name: "VIP Lounge",    price: 800, remaining: 80   },
@@ -419,6 +428,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     price: 200, status: "upcoming", times: ["month"], sortKey: 11,
     organizer: "Ministry of Culture", date: "Wed 9 Jul 2025", time: "10:00 – 18:00",
     about: "A celebration of South Sudanese art, craft, and heritage. Featuring live weaving, painting, sculpture, and spoken word.",
+    image: "https://images.unsplash.com/photo-1578926288207-32356e5e1b37?w=600&q=80",
     tiers: [{ id: "gen", name: "General Admission", price: 200, remaining: 1500 }],
   },
   {
@@ -426,6 +436,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     price: 0, status: "upcoming", times: ["month"], sortKey: 12,
     organizer: "National Council of Churches", date: "Fri 11 Jul 2025", time: "18:00 – 23:59",
     about: "An evening of prayer, worship, and revival music. Open to all faiths. Free entry. Bring your own seating.",
+    image: "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=600&q=80",
     tiers: [{ id: "free", name: "Free entry", price: 0, remaining: 5000 }],
   },
 ];
