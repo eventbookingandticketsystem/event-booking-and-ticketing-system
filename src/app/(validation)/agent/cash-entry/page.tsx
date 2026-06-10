@@ -6,15 +6,15 @@ import { Icon } from "@/components/Shared/Icon";
 import { cn } from "@/lib/utils";
 
 const CAT_OPTIONS = [
-  { value: "General", label: "General Admission", price: 18000 },
-  { value: "VIP",     label: "VIP",               price: 45000 },
-  { value: "Student", label: "Student",            price: 9000  },
+  { value: "General", label: "General Admission", price: 14 },
+  { value: "VIP",     label: "VIP",               price: 35 },
+  { value: "Student", label: "Student",            price: 7  },
 ] as const;
 
 type CatValue = (typeof CAT_OPTIONS)[number]["value"];
 
-function formatSSP(n: number): string {
-  return `SSP ${n.toLocaleString("en-US")}`;
+function formatUSD(n: number): string {
+  return `$${n.toLocaleString("en-US")}`;
 }
 
 export default function CashEntryPage() {
@@ -38,7 +38,7 @@ export default function CashEntryPage() {
 
   const amountWarn =
     amount !== "" && Number(amount) !== expectedPrice
-      ? `Expected ${formatSSP(expectedPrice)} for ${catObj.label}`
+      ? `Expected ${formatUSD(expectedPrice)} for ${catObj.label}`
       : "";
 
   const isValid = !nameErr && !!cat;
@@ -139,7 +139,7 @@ export default function CashEntryPage() {
               >
                 {CAT_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value} style={{ color: "#000", background: "#fff" }}>
-                    {o.label} — {formatSSP(o.price)}
+                    {o.label} — {formatUSD(o.price)}
                   </option>
                 ))}
               </select>
@@ -154,7 +154,7 @@ export default function CashEntryPage() {
           {/* Amount paid */}
           <div className="flex flex-col gap-2">
             <label htmlFor="cash-amount" className="text-[11px] font-semibold uppercase tracking-[0.8px] text-white/50">
-              Amount paid (SSP)
+              Amount paid (USD)
             </label>
             <input
               id="cash-amount"
@@ -164,7 +164,7 @@ export default function CashEntryPage() {
               onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))}
               placeholder={String(expectedPrice)}
               disabled={loading}
-              aria-label="Amount paid in SSP"
+              aria-label="Amount paid in USD"
               className="w-full h-[52px] px-4 rounded-lg border border-white/12 bg-white/8 text-white text-[15px] font-body placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-brand-orange disabled:opacity-60 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
             {amountWarn && (

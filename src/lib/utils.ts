@@ -6,11 +6,14 @@ export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
 }
 
-// Format a number as SSP currency
-// formatSSP(18000) → "SSP 18,000"
-export function formatSSP(n: number): string {
-  return "SSP " + n.toLocaleString("en-US");
+// Format a number as USD currency
+// formatUSD(35) → "$35"  |  formatUSD(1200) → "$1,200"
+export function formatUSD(n: number): string {
+  return "$" + n.toLocaleString("en-US");
 }
+
+// Alias kept for backward compatibility — prefer formatUSD
+export const formatSSP = formatUSD;
 
 // Format a date string for display
 // Passes through already-formatted strings (e.g. "Sat, 14 Dec 2025")

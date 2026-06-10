@@ -54,7 +54,7 @@ export const EVENTS: EventType[] = [
       {
         id: "vip",
         name: "VIP",
-        price: 45000,
+        price: 35,
         capacity: 400,
         remaining: 12,
         lowStock: true,
@@ -62,14 +62,14 @@ export const EVENTS: EventType[] = [
       {
         id: "gen",
         name: "General",
-        price: 18000,
+        price: 14,
         capacity: 1400,
         remaining: 612,
       },
       {
         id: "stu",
         name: "Student",
-        price: 9000,
+        price: 7,
         capacity: 200,
         remaining: 0,
         soldOut: true,
@@ -93,14 +93,14 @@ export const EVENTS: EventType[] = [
       {
         id: "vip",
         name: "VIP Stand",
-        price: 25000,
+        price: 20,
         capacity: 600,
         remaining: 88,
       },
       {
         id: "gen",
         name: "General Stand",
-        price: 7000,
+        price: 5,
         capacity: 8000,
         remaining: 2340,
       },
@@ -123,7 +123,7 @@ export const EVENTS: EventType[] = [
       {
         id: "fam",
         name: "Family Guest",
-        price: 5000,
+        price: 4,
         capacity: 1200,
         remaining: 140,
       },
@@ -146,14 +146,14 @@ export const EVENTS: EventType[] = [
       {
         id: "del",
         name: "Delegate",
-        price: 30000,
+        price: 25,
         capacity: 300,
         remaining: 47,
       },
       {
         id: "stu",
         name: "Student",
-        price: 12000,
+        price: 10,
         capacity: 100,
         remaining: 9,
         lowStock: true,
@@ -177,11 +177,11 @@ export const EVENTS: EventType[] = [
       {
         id: "gen",
         name: "General",
-        price: 6000,
+        price: 5,
         capacity: 3000,
         remaining: 1820,
       },
-      { id: "vip", name: "VIP", price: 20000, capacity: 250, remaining: 64 },
+      { id: "vip", name: "VIP", price: 15, capacity: 250, remaining: 64 },
     ],
   },
 ];
@@ -226,7 +226,7 @@ export const DASH: DashboardData = {
   capacity: 2000,
   sold: 1891,
   fraud: 4,
-  revenue: 94550,
+  revenue: 37840,
   entryRate: [
     { t: "17:00", v: 40 },
     { t: "17:30", v: 120 },
@@ -383,7 +383,7 @@ export const GATE_AGENTS: GateAgentType[] = [
 export const REPORT: ReportData = {
   event: "University of Juba Graduation 2025",
   attended: 1043,
-  revenue: 5215000,
+  revenue: 4172,
   fraud: 7,
   duration: "1h 52m",
   entryRate: [
@@ -509,7 +509,7 @@ export const ORGANIZERS: OrganizerType[] = [
     phone: "+211 922 700 145",
     org: "Nile Live Events",
     events: 5,
-    revenue: 4820000,
+    revenue: 3708,
     status: "Active",
     joined: "12 Aug 2025",
   },
@@ -520,7 +520,7 @@ export const ORGANIZERS: OrganizerType[] = [
     phone: "+211 955 318 220",
     org: "SSFA",
     events: 3,
-    revenue: 9650000,
+    revenue: 7423,
     status: "Active",
     joined: "3 Sep 2025",
   },
@@ -531,7 +531,7 @@ export const ORGANIZERS: OrganizerType[] = [
     phone: "+211 911 470 660",
     org: "University of Juba",
     events: 2,
-    revenue: 5215000,
+    revenue: 4172,
     status: "Active",
     joined: "21 Jul 2025",
   },
@@ -542,7 +542,7 @@ export const ORGANIZERS: OrganizerType[] = [
     phone: "+211 928 905 412",
     org: "AmaliTech",
     events: 4,
-    revenue: 2140000,
+    revenue: 1646,
     status: "Active",
     joined: "1 Oct 2025",
   },
@@ -553,7 +553,7 @@ export const ORGANIZERS: OrganizerType[] = [
     phone: "+211 920 661 037",
     org: "Grace Arena",
     events: 1,
-    revenue: 380000,
+    revenue: 292,
     status: "Suspended",
     joined: "18 Oct 2025",
   },
@@ -776,7 +776,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     category: "Music",
     venue: "Juba Stadium",
     city: "Juba",
-    price: 500,
+    price: 14,
     status: "happening-now",
     times: ["happening-now", "today"],
     sortKey: 1,
@@ -788,8 +788,8 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     image:
       "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=600&q=80",
     tiers: [
-      { id: "vip", name: "VIP", price: 2500, remaining: 40 },
-      { id: "gen", name: "General", price: 500, remaining: 1200 },
+      { id: "vip", name: "VIP", price: 35, remaining: 40 },
+      { id: "gen", name: "General", price: 14, remaining: 1200 },
     ],
   },
   {
@@ -798,7 +798,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     category: "Sports",
     venue: "Juba Stadium",
     city: "Juba",
-    price: 200,
+    price: 5,
     status: "happening-now",
     times: ["happening-now", "today"],
     sortKey: 2,
@@ -810,8 +810,8 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     image:
       "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=600&q=80",
     tiers: [
-      { id: "vip", name: "VIP Stand", price: 800, remaining: 60 },
-      { id: "gen", name: "General Stand", price: 200, remaining: 3400 },
+      { id: "vip", name: "VIP Stand", price: 20, remaining: 60 },
+      { id: "gen", name: "General Stand", price: 5, remaining: 3400 },
     ],
   },
   {
@@ -860,7 +860,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     category: "Conference",
     venue: "Radisson Juba",
     city: "Juba",
-    price: 1500,
+    price: 25,
     status: "upcoming",
     times: ["month"],
     sortKey: 6,
@@ -872,8 +872,8 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     image:
       "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&q=80",
     tiers: [
-      { id: "del", name: "Delegate", price: 1500, remaining: 120 },
-      { id: "vip", name: "Executive", price: 4000, remaining: 30 },
+      { id: "del", name: "Delegate", price: 25, remaining: 120 },
+      { id: "vip", name: "Executive", price: 60, remaining: 30 },
     ],
   },
   {
@@ -882,7 +882,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     category: "Music",
     venue: "Eden Garden Juba",
     city: "Juba",
-    price: 300,
+    price: 10,
     status: "upcoming",
     times: ["weekend", "month"],
     sortKey: 7,
@@ -894,8 +894,8 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     image:
       "https://images.unsplash.com/photo-1415201364774-f6f0bb35f28f?w=600&q=80",
     tiers: [
-      { id: "gen", name: "General", price: 300, remaining: 400 },
-      { id: "vip", name: "Lounge", price: 1200, remaining: 50 },
+      { id: "gen", name: "General", price: 10, remaining: 400 },
+      { id: "vip", name: "Lounge", price: 30, remaining: 50 },
     ],
   },
   {
@@ -904,7 +904,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     category: "Sports",
     venue: "Juba Stadium",
     city: "Juba",
-    price: 100,
+    price: 3,
     status: "upcoming",
     times: ["weekend", "month"],
     sortKey: 8,
@@ -915,7 +915,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
       "Matchweek 24 of the South Sudan Premier League. A local derby with everything to play for.",
     image:
       "https://images.unsplash.com/photo-1577223625816-7546f13df25d?w=600&q=80",
-    tiers: [{ id: "gen", name: "General Stand", price: 100, remaining: 5000 }],
+    tiers: [{ id: "gen", name: "General Stand", price: 3, remaining: 5000 }],
   },
   {
     id: "x-youth",
@@ -923,7 +923,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     category: "Conference",
     venue: "UNMISS Hall",
     city: "Juba",
-    price: 750,
+    price: 12,
     status: "upcoming",
     times: ["month"],
     sortKey: 9,
@@ -934,7 +934,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
       "Young leaders from across the ten states convene for a day of workshops, panels, and networking.",
     image:
       "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=600&q=80",
-    tiers: [{ id: "gen", name: "Delegate", price: 750, remaining: 300 }],
+    tiers: [{ id: "gen", name: "Delegate", price: 12, remaining: 300 }],
   },
   {
     id: "x-food",
@@ -942,7 +942,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     category: "Food & Drinks",
     venue: "Freedom Square, Juba",
     city: "Juba",
-    price: 150,
+    price: 5,
     status: "upcoming",
     times: ["weekend", "month"],
     sortKey: 10,
@@ -954,8 +954,8 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     image:
       "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=600&q=80",
     tiers: [
-      { id: "gen", name: "General Entry", price: 150, remaining: 2000 },
-      { id: "vip", name: "VIP Lounge", price: 800, remaining: 80 },
+      { id: "gen", name: "General Entry", price: 5, remaining: 2000 },
+      { id: "vip", name: "VIP Lounge", price: 20, remaining: 80 },
     ],
   },
   {
@@ -964,7 +964,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     category: "Arts & Culture",
     venue: "Nyakuron Cultural Centre",
     city: "Juba",
-    price: 200,
+    price: 6,
     status: "upcoming",
     times: ["month"],
     sortKey: 11,
@@ -976,7 +976,7 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     image:
       "https://images.unsplash.com/photo-1578926288207-32356e5e1b37?w=600&q=80",
     tiers: [
-      { id: "gen", name: "General Admission", price: 200, remaining: 1500 },
+      { id: "gen", name: "General Admission", price: 6, remaining: 1500 },
     ],
   },
   {

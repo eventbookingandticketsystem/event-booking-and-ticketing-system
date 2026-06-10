@@ -1,7 +1,6 @@
 'use client';
 
-import { cn } from "@/lib/utils";
-import { formatSSP } from "@/lib/utils";
+import { cn, formatUSD } from "@/lib/utils";
 import { Icon } from "./Icon";
 import type { TicketTier } from "@/types/event";
 
@@ -45,7 +44,7 @@ export function TierSelector({ tier, qty, onQtyChange, className }: TierSelector
             )}
           </div>
           <p className="font-display font-bold text-brand-orange text-base">
-            {tier.price === 0 ? "Free" : formatSSP(tier.price)}
+            {tier.price === 0 ? "Free" : formatUSD(tier.price)}
           </p>
           <p className="text-xs text-text-muted mt-0.5">
             {isSoldOut

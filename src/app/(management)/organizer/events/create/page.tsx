@@ -224,7 +224,7 @@ export default function CreateEventPage() {
   // Step 2 per-cat validation
   const catErr = (c: CatBlock) => ({
     name: !c.name.trim() ? "Required" : "",
-    price: c.price === "" ? "Required" : Number(c.price) < 0 ? "Min 0 SSP" : "",
+    price: c.price === "" ? "Required" : Number(c.price) < 0 ? "Min $0" : "",
     capacity: c.capacity === "" ? "Required" : Number(c.capacity) < 1 ? "Min 1" : "",
     open: !c.open ? "Required" : "",
     close: !c.close ? "Required"
@@ -412,7 +412,7 @@ export default function CreateEventPage() {
                           <TextInput value={c.name} onChange={(v) => setCat(i, "name", v)} placeholder="e.g. VIP" error={ce(c, "name")} />
                         </FieldWrap>
                       </div>
-                      <FieldWrap label="Price (SSP)" error={ce(c, "price")}>
+                      <FieldWrap label="Price (USD)" error={ce(c, "price")}>
                         <NumInput value={c.price} onChange={(v) => setCat(i, "price", v)} placeholder="0" min={0} error={ce(c, "price")} />
                       </FieldWrap>
                       <FieldWrap label="Capacity" error={ce(c, "capacity")}>
@@ -497,7 +497,7 @@ export default function CreateEventPage() {
                         <tr key={i} className="border-b border-border/50 last:border-b-0">
                           <td className="px-5 py-3 font-semibold">{c.name || `Category ${i + 1}`}</td>
                           <td className="px-4 py-3 font-mono text-[13px]">
-                            {c.price ? `SSP ${Number(c.price).toLocaleString("en-US")}` : "—"}
+                            {c.price ? `$${Number(c.price).toLocaleString("en-US")}` : "—"}
                           </td>
                           <td className="px-4 py-3 font-mono text-[13px]">{c.capacity || "—"}</td>
                         </tr>

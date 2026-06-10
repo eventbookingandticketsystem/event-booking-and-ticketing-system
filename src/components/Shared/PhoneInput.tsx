@@ -86,14 +86,13 @@ export function PhoneInput({ value, onChange, error, disabled = false, label = "
             aria-haspopup="listbox"
             className="flex items-center gap-1.5 px-3 border-r border-border bg-surface-bg rounded-l-sm hover:bg-border/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-orange disabled:opacity-60 shrink-0"
           >
-            {/* Country flag box */}
-            <span
-              className="inline-flex items-center justify-center w-[26px] h-[18px] rounded-[3px] text-white text-[10px] font-bold tracking-[0.3px] shrink-0"
-              style={{ background: selected.color }}
-              aria-hidden="true"
-            >
-              {selected.code}
-            </span>
+            {/* Country flag */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`https://flagcdn.com/w20/${selected.code.toLowerCase()}.png`}
+              alt={selected.name}
+              className="w-6.5 h-4.5 object-cover rounded-[3px] shrink-0"
+            />
             <span className="text-sm font-medium text-text">{selected.dial}</span>
             <Icon name="ChevronDown" size={14} className="text-text-muted" />
           </button>
@@ -150,13 +149,12 @@ export function PhoneInput({ value, onChange, error, disabled = false, label = "
                         country.code === value.code && "bg-surface-alt",
                       )}
                     >
-                      <span
-                        className="inline-flex items-center justify-center w-[26px] h-[18px] rounded-[3px] text-white text-[10px] font-bold tracking-[0.3px] shrink-0"
-                        style={{ background: country.color }}
-                        aria-hidden="true"
-                      >
-                        {country.code}
-                      </span>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`https://flagcdn.com/w20/${country.code.toLowerCase()}.png`}
+                        alt={country.name}
+                        className="w-6.5 h-4.5 object-cover rounded-[3px] shrink-0"
+                      />
                       <span className="flex-1 text-sm font-medium text-text truncate">{country.name}</span>
                       <span className="text-[13px] text-text-secondary shrink-0">{country.dial}</span>
                     </button>

@@ -15,7 +15,7 @@ interface BookingLine extends TicketTier {
   qty: number;
 }
 
-const SERVICE_FEE = 500;
+const SERVICE_FEE = 1;
 
 interface PageProps {
   params: Promise<{ id: string }>;
