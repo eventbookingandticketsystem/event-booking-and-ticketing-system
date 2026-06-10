@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -9,10 +9,19 @@ import { EXPLORE_EVENTS } from "@/lib/mock-data";
 import { ROUTES } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 
-const CATEGORIES = ["All", "Music", "Sports", "Conference", "Church", "Graduation", "Food & Drinks", "Arts & Culture"] as const;
+const CATEGORIES = [
+  "All",
+  "Music",
+  "Sports",
+  "Conference",
+  "Church",
+  "Graduation",
+  "Food & Drinks",
+  "Arts & Culture",
+] as const;
 type Category = (typeof CATEGORIES)[number];
 
-const INITIAL_VISIBLE = 9;
+const INITIAL_VISIBLE = 8;
 
 export function FeaturedEvents() {
   const router = useRouter();
@@ -36,7 +45,6 @@ export function FeaturedEvents() {
   return (
     <section className="py-[72px] bg-surface-bg">
       <div className="max-w-[1120px] mx-auto px-7">
-
         {/* Section header */}
         <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
           <div>
@@ -90,10 +98,18 @@ export function FeaturedEvents() {
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <span className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-surface border border-border mb-4">
-              <Icon name="CalendarSearch" size={26} className="text-text-muted" />
+              <Icon
+                name="CalendarSearch"
+                size={26}
+                className="text-text-muted"
+              />
             </span>
-            <p className="font-display font-semibold text-[17px] text-text mb-1">No events in this category</p>
-            <p className="text-sm text-text-secondary">Try a different category or check back soon.</p>
+            <p className="font-display font-semibold text-[17px] text-text mb-1">
+              No events in this category
+            </p>
+            <p className="text-sm text-text-secondary">
+              Try a different category or check back soon.
+            </p>
           </div>
         ) : (
           <>

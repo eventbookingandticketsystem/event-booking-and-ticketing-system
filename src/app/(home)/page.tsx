@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Home/Navbar";
@@ -14,9 +14,9 @@ import { ROUTES } from "@/constants/routes";
 export default function HomePage() {
   const router = useRouter();
 
-  const handleSignIn  = () => router.push(ROUTES.LOGIN);
+  const handleSignIn = () => router.push(ROUTES.LOGIN);
   const handleRegister = () => router.push(ROUTES.REGISTER);
-  const handleExplore  = () => router.push(ROUTES.EXPLORE);
+  const handleExplore = () => router.push(ROUTES.EXPLORE);
 
   return (
     <div className="min-h-screen bg-surface">
@@ -27,12 +27,12 @@ export default function HomePage() {
       />
 
       <main>
+        <FeaturedEvents />
         <HeroSection
           onSignIn={handleSignIn}
           onRegister={handleRegister}
           onExplore={handleExplore}
         />
-        <FeaturedEvents />
         <HowItWorks />
         <Features />
         <EventTypes />
