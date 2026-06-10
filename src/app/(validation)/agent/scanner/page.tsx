@@ -438,9 +438,10 @@ export default function ScannerPage() {
           />
           <div className="absolute top-12 right-2 z-40 w-52 bg-surface border border-border rounded-lg shadow-pop overflow-hidden">
             {[
-              { icon: "Wallet"  as const, label: "Manual cash entry", action: () => router.push(ROUTES.AGENT_CASH) },
-              { icon: "RefreshCw" as const, label: "Sync offline scans", action: () => { setSheetOpen(true); setMenuOpen(false); } },
-              { icon: "LogOut"  as const, label: "Exit scanner",       action: () => router.back() },
+              { icon: "Wallet"     as const, label: "Manual cash entry",    action: () => router.push(ROUTES.AGENT_CASH) },
+              { icon: "RefreshCw"  as const, label: "Sync offline scans",   action: () => { setSheetOpen(true); setMenuOpen(false); } },
+              { icon: "House"      as const, label: "Back to home",         action: () => router.push(ROUTES.HOME) },
+              { icon: "LogOut"     as const, label: "Sign out",             action: () => router.push(ROUTES.LOGIN) },
             ].map((item, i) => (
               <button
                 key={item.label}
