@@ -42,22 +42,29 @@ export function EventCard({ event, featured = false, onClick, className }: Event
       {/* Poster */}
       <div
         className={cn("relative overflow-hidden", featured ? "h-48" : "h-40")}
-        style={{ backgroundImage: poster }}
+        style={{ background: poster }}
       >
-        {/* Subtle dot-pattern overlay */}
-        <div
-          className="absolute inset-0 opacity-5"
-          style={{ backgroundImage: "repeating-linear-gradient(135deg, #fff 0 1px, transparent 1px 13px)" }}
-          aria-hidden="true"
-        />
-        {/* Gradient overlay */}
+        {/* Photo layer — covers gradient when image loads */}
+        {event.image && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={event.image}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover object-center"
+            loading="lazy"
+            decoding="async"
+          />
+        )}
+
+        {/* Gradient overlay — sits on top of photo */}
         <div
           className="absolute inset-0"
-          style={{ background: "linear-gradient(to top, rgba(8,40,59,0.65) 0%, transparent 55%)" }}
+          style={{ background: "linear-gradient(to top, rgba(8,40,59,0.72) 0%, rgba(8,40,59,0.15) 55%, transparent 100%)" }}
           aria-hidden="true"
         />
         {/* Category label top-right */}
-        <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-[1px] text-white/50">
+        <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-[1px] text-white/70 drop-shadow">
           {event.category}
         </span>
       </div>

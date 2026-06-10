@@ -16,6 +16,7 @@ export interface EventType {
   title: string;
   category: string;   // "Concert" | "Football" | "Conference" | "Graduation"
   poster: string;     // CSS gradient string
+  image?: string;     // optional photo URL (Unsplash etc.)
   organizer: string;
   date: string;       // "Sat, 14 Dec 2025"
   time: string;       // "6:00 PM – 11:00 PM"

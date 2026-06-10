@@ -21,9 +21,11 @@ export default function SystemLayout({ children }: { children: React.ReactNode }
   return (
     <>
       {/* Desktop layout */}
-      <div className="hidden lg:flex min-h-screen bg-surface-bg">
+      <div className="hidden lg:flex h-screen overflow-hidden bg-surface-bg">
+        {/* Sidebar — fixed full height */}
         <AdminSidebar active={nav} onNav={setNav} />
-        <div className="flex flex-col flex-1 min-w-0">
+        {/* Right column: topbar stays fixed, content scrolls */}
+        <div className="flex flex-col flex-1 min-w-0 h-screen">
           <AdminTopbar crumb={crumb} onCrumbRoot={() => setNav("overview")} />
           <main className="flex-1 overflow-y-auto">
             {children}

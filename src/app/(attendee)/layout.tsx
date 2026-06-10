@@ -181,9 +181,11 @@ export default function AttendeeLayout({
       </div>
 
       {/* ── DESKTOP (≥ 768px) — full-width sidebar shell ── */}
-      <div className="hidden md:flex min-h-screen bg-surface-bg">
+      <div className="hidden md:flex h-screen overflow-hidden bg-surface-bg">
+        {/* Sidebar — sticky full height */}
         <AttendeeSidebar active={activeTab} onNav={handleTab} />
-        <div className="flex flex-col flex-1 min-w-0">
+        {/* Right column: topbar fixed + scrollable content */}
+        <div className="flex flex-col flex-1 min-w-0 h-screen">
           <AttendeeTopbar active={activeTab} />
           <main className="flex-1 overflow-y-auto">
             {children}

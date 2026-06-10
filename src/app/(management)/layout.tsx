@@ -57,14 +57,14 @@ export default function ManagementLayout({
       </div>
 
       {/* Desktop layout */}
-      <div className="hidden lg:flex min-h-screen w-full">
+      <div className="hidden lg:flex h-screen overflow-hidden w-full">
         {/* Fixed sidebar */}
         <div className="fixed top-0 left-0 h-screen z-30">
           <OrgSidebar active={activeNav} onNav={handleNav} />
         </div>
 
-        {/* Main area, offset by sidebar width */}
-        <div className="flex flex-col flex-1 ml-[220px] min-h-screen overflow-hidden">
+        {/* Main area — offset by sidebar, fills remaining height */}
+        <div className="flex flex-col flex-1 ml-[220px] h-screen overflow-hidden">
           <main className="flex-1 overflow-y-auto bg-surface-bg">
             {children}
           </main>
