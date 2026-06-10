@@ -258,6 +258,18 @@ export default function ScannerPage() {
   // ── Start camera ────────────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
     setCamState("requesting");
+
+    // getUserMedia requires a secure context (HTTPS or localhost with flag).
+    // On plain HTTP (e.g. a remote dev server over HTTP), mediaDevices is undefined.
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices ||
+      typeof navigator.mediaDevices.getUserMedia !== "function"
+    ) {
+      setCamState("unavailable");
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
@@ -266,14 +278,16 @@ export default function ScannerPage() {
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        // play() may throw on some browsers if the video is already playing
+        try { await videoRef.current.play(); } catch { /* already playing */ }
       }
       setCamState("active");
     } catch (err) {
-      const name = (err as Error).name;
-      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+      const errName = (err as Error).name;
+      if (errName === "NotAllowedError" || errName === "PermissionDeniedError") {
         setCamState("denied");
       } else {
+        // NotFoundError, NotReadableError, OverconstrainedError, etc.
         setCamState("unavailable");
       }
     }
@@ -364,10 +378,20 @@ export default function ScannerPage() {
       {/* ── Viewfinder area ── */}
       <div className="flex-1 flex flex-col items-center justify-center gap-5 relative overflow-hidden">
 
-        {/* Camera frame */}
-        <div className="relative w-[280px] h-[280px] md:w-[320px] md:h-[320px]">
+        {/* Camera frame — always visible */}
+        <div className="relative w-[280px] h-[280px] md:w-[340px] md:h-[340px]">
 
-          {/* Video feed */}
+          {/* Dark background — always shown as fallback */}
+          <div className="absolute inset-0 rounded-xl overflow-hidden bg-[#040d14]">
+            {/* Subtle grid texture */}
+            <div
+              className="absolute inset-0"
+              style={{ backgroundImage: "repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 32px), repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 32px)" }}
+              aria-hidden="true"
+            />
+          </div>
+
+          {/* Video feed — always mounted, shown when active */}
           <video
             ref={videoRef}
             muted
@@ -375,33 +399,35 @@ export default function ScannerPage() {
             autoPlay
             aria-label="Camera viewfinder"
             className={cn(
-              "absolute inset-0 w-full h-full object-cover rounded-xl",
+              "absolute inset-0 w-full h-full object-cover rounded-xl transition-opacity duration-300",
               camState === "active" ? "opacity-100" : "opacity-0",
             )}
           />
 
-          {/* Dark placeholder when camera not active */}
+          {/* Overlay message when camera not streaming */}
           {camState !== "active" && (
-            <div className="absolute inset-0 rounded-xl bg-black/60 flex flex-col items-center justify-center gap-3 px-4">
+            <div className="absolute inset-0 rounded-xl flex flex-col items-center justify-center gap-3 px-5 z-10">
               {camState === "requesting" && (
                 <>
-                  <svg className="animate-spin h-8 w-8 text-white/40" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <svg className="animate-spin h-7 w-7 text-brand-orange/60" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                   </svg>
-                  <p className="text-white/50 text-sm text-center">Requesting camera…</p>
+                  <p className="text-white/50 text-[13px] text-center">Requesting camera access…</p>
                 </>
               )}
               {camState === "denied" && (
                 <>
-                  <Icon name="CameraOff" size={32} className="text-white/30" />
-                  <p className="text-white/60 text-sm text-center leading-snug">
-                    Camera access denied.<br />Enable in browser settings.
+                  <Icon name="CameraOff" size={28} className="text-white/30" />
+                  <p className="text-white/55 text-[13px] text-center leading-snug">
+                    Camera blocked.<br />
+                    <span className="text-white/35 text-[11px]">Allow access in browser settings, then retry.</span>
                   </p>
                   <button
                     type="button"
                     onClick={startCamera}
-                    className="mt-1 px-4 py-2 rounded-lg bg-white/10 text-white text-xs font-semibold hover:bg-white/20 transition-colors"
+                    aria-label="Retry camera access"
+                    className="px-4 py-1.5 rounded-lg bg-brand-orange/20 border border-brand-orange/40 text-brand-orange text-[12px] font-semibold hover:bg-brand-orange/30 transition-colors"
                   >
                     Retry
                   </button>
@@ -409,23 +435,26 @@ export default function ScannerPage() {
               )}
               {camState === "unavailable" && (
                 <>
-                  <Icon name="CameraOff" size={32} className="text-white/30" />
-                  <p className="text-white/60 text-sm text-center leading-snug">
-                    No camera found.<br />Use demo buttons below.
+                  <Icon name="CameraOff" size={28} className="text-white/30" />
+                  <p className="text-white/55 text-[13px] text-center leading-snug">
+                    No camera available.<br />
+                    <span className="text-white/35 text-[11px]">Use the demo buttons below to simulate scans.</span>
                   </p>
                 </>
               )}
             </div>
           )}
 
-          {/* Animated scan line — only when camera active */}
-          {camState === "active" && (
-            <div
-              className="absolute left-2 right-2 h-[2px] bg-brand-orange rounded-full z-10"
-              style={{ animation: "scanline 2s linear infinite" }}
-              aria-hidden="true"
-            />
-          )}
+          {/* Scan line — ALWAYS animating (shows the scanner is ready) */}
+          <div
+            className="absolute left-3 right-3 h-[2px] rounded-full z-20 pointer-events-none"
+            style={{
+              background: "linear-gradient(90deg, transparent, #FF5A00, transparent)",
+              boxShadow: "0 0 8px 2px rgba(255,90,0,0.5)",
+              animation: "scanline 1.8s ease-in-out infinite alternate",
+            }}
+            aria-hidden="true"
+          />
 
           {/* Corner brackets */}
           {[
@@ -436,12 +465,12 @@ export default function ScannerPage() {
           ].map((pos, i) => (
             <span
               key={i}
-              className="absolute w-[28px] h-[28px] z-10"
+              className="absolute w-[28px] h-[28px] z-20"
               style={{
-                top:          pos.top    !== undefined ? pos.top    : undefined,
-                bottom:       pos.bottom !== undefined ? pos.bottom : undefined,
-                left:         pos.left   !== undefined ? pos.left   : undefined,
-                right:        pos.right  !== undefined ? pos.right  : undefined,
+                top:               pos.top    !== undefined ? pos.top    : undefined,
+                bottom:            pos.bottom !== undefined ? pos.bottom : undefined,
+                left:              pos.left   !== undefined ? pos.left   : undefined,
+                right:             pos.right  !== undefined ? pos.right  : undefined,
                 borderTopWidth:    pos.borderTop    ? 3 : 0,
                 borderBottomWidth: pos.borderBottom ? 3 : 0,
                 borderLeftWidth:   pos.borderLeft   ? 3 : 0,
@@ -459,7 +488,9 @@ export default function ScannerPage() {
           {camState === "active"
             ? "Point camera at a ticket QR code"
             : camState === "denied"
-            ? "Camera access required for scanning"
+            ? "Grant camera permission, then retry"
+            : camState === "requesting"
+            ? "Waiting for camera permission…"
             : "Use demo buttons to simulate a scan"}
         </p>
 
@@ -533,12 +564,11 @@ export default function ScannerPage() {
         <ResultOverlay result={result} onReset={handleReset} />
       )}
 
-      {/* Scan line animation */}
+      {/* Scan line animation — alternate so it bounces instead of snapping */}
       <style>{`
         @keyframes scanline {
-          0%   { top: 8px; }
-          50%  { top: calc(100% - 10px); }
-          100% { top: 8px; }
+          from { top: 6px; }
+          to   { top: calc(100% - 8px); }
         }
       `}</style>
     </div>
