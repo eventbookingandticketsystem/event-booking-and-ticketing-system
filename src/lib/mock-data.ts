@@ -404,6 +404,30 @@ export const EXPLORE_EVENTS: ExploreEventType[] = [
     about: "Young leaders from across the ten states convene for a day of workshops, panels, and networking.",
     tiers: [{ id: "gen", name: "Delegate", price: 750, remaining: 300 }],
   },
+  {
+    id: "x-food",  title: "Juba Street Food Festival",           category: "Food & Drinks", venue: "Freedom Square, Juba", city: "Juba",
+    price: 150, status: "upcoming", times: ["weekend", "month"], sortKey: 10,
+    organizer: "AmaliTech Events", date: "Sat 5 Jul 2025", time: "12:00 – 22:00",
+    about: "Fifty vendors, twelve cuisines, and live entertainment across two outdoor stages. Family-friendly, pet-friendly.",
+    tiers: [
+      { id: "gen", name: "General Entry", price: 150, remaining: 2000 },
+      { id: "vip", name: "VIP Lounge",    price: 800, remaining: 80   },
+    ],
+  },
+  {
+    id: "x-arts",  title: "South Sudan Arts & Culture Expo",     category: "Arts & Culture", venue: "Nyakuron Cultural Centre", city: "Juba",
+    price: 200, status: "upcoming", times: ["month"], sortKey: 11,
+    organizer: "Ministry of Culture", date: "Wed 9 Jul 2025", time: "10:00 – 18:00",
+    about: "A celebration of South Sudanese art, craft, and heritage. Featuring live weaving, painting, sculpture, and spoken word.",
+    tiers: [{ id: "gen", name: "General Admission", price: 200, remaining: 1500 }],
+  },
+  {
+    id: "x-prayer", title: "National Prayer & Revival Night",    category: "Church",     venue: "Dr. John Garang Mausoleum Grounds", city: "Juba",
+    price: 0, status: "upcoming", times: ["month"], sortKey: 12,
+    organizer: "National Council of Churches", date: "Fri 11 Jul 2025", time: "18:00 – 23:59",
+    about: "An evening of prayer, worship, and revival music. Open to all faiths. Free entry. Bring your own seating.",
+    tiers: [{ id: "free", name: "Free entry", price: 0, remaining: 5000 }],
+  },
 ];
 
 export const EXPLORE_BY_ID: Record<string, ExploreEventType> = Object.fromEntries(

@@ -6,6 +6,7 @@ import { HeroSection } from "@/components/Home/HeroSection";
 import { HowItWorks } from "@/components/Home/HowItWorks";
 import { Features } from "@/components/Home/Features";
 import { EventTypes } from "@/components/Home/EventTypes";
+import { FeaturedEvents } from "@/components/Home/FeaturedEvents";
 import { CtaBand } from "@/components/Home/CtaBand";
 import { Footer } from "@/components/Home/Footer";
 import { ROUTES } from "@/constants/routes";
@@ -34,6 +35,7 @@ export default function HomePage() {
         <HowItWorks />
         <Features />
         <EventTypes />
+        <FeaturedEvents />
         <CtaBand onSignIn={handleSignIn} onRegister={handleRegister} />
       </main>
 
