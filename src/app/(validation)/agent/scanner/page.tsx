@@ -328,17 +328,17 @@ export default function ScannerPage() {
   };
 
   return (
-    <div className="w-screen h-screen bg-brand-navy flex flex-col overflow-hidden relative">
+    <div className="h-full bg-brand-navy flex flex-col overflow-hidden relative">
 
-      {/* ── Top bar ── */}
-      <div className="h-12 flex items-center gap-2 px-4 shrink-0 border-b border-white/8 bg-brand-navy-2/80 z-20">
+      {/* ── Scanner info bar (event name + admitted + online status) ── */}
+      <div className="h-10 flex items-center gap-2 px-4 shrink-0 border-b border-white/8 bg-brand-navy-2/60">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <Icon name="Ticket" size={16} className="text-brand-orange shrink-0" />
-          <span className="text-white/80 text-sm truncate">{EVENT_NAME}</span>
+          <Icon name="Ticket" size={14} className="text-brand-orange shrink-0" />
+          <span className="text-white/70 text-xs truncate">{EVENT_NAME}</span>
         </div>
 
-        <span className="font-mono text-white text-sm shrink-0 px-2">
-          {admitted.toLocaleString()} <span className="text-white/50">admitted</span>
+        <span className="font-mono text-white text-xs shrink-0 px-1">
+          {admitted.toLocaleString()} <span className="text-white/40">in</span>
         </span>
 
         <button
@@ -346,13 +346,13 @@ export default function ScannerPage() {
           onClick={handlePillClick}
           aria-label={online ? "Online — tap for sync" : "Offline — tap for sync"}
           className={cn(
-            "flex items-center gap-1 px-2.5 py-1 rounded-pill text-[12px] font-semibold shrink-0 transition-colors",
+            "flex items-center gap-1 px-2 py-0.5 rounded-pill text-[11px] font-semibold shrink-0 transition-colors",
             online
               ? "bg-status-success-bg text-status-success"
               : "bg-status-warning-bg text-status-warning",
           )}
         >
-          <Icon name={online ? "Wifi" : "WifiOff"} size={12} />
+          <Icon name={online ? "Wifi" : "WifiOff"} size={11} />
           {online ? "Online" : "Offline"}
         </button>
 
@@ -361,9 +361,9 @@ export default function ScannerPage() {
           onClick={() => setMenuOpen((m) => !m)}
           aria-label="Open menu"
           aria-expanded={menuOpen}
-          className="w-8 h-8 rounded-full inline-flex items-center justify-center text-white/70 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+          className="w-7 h-7 rounded-full inline-flex items-center justify-center text-white/60 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
         >
-          <Icon name="Ellipsis" size={18} />
+          <Icon name="Ellipsis" size={16} />
         </button>
       </div>
 

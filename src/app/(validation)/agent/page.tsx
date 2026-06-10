@@ -56,32 +56,10 @@ export default function GateSelectorPage() {
   const startDownload = () => { setPhase("downloading"); setPct(0); };
 
   return (
-    <div className="w-screen h-screen bg-brand-navy flex flex-col overflow-hidden">
-
-      {/* ── Top bar: exit controls ── */}
-      <div className="flex items-center justify-between px-4 h-12 border-b border-white/8 shrink-0">
-        <button
-          type="button"
-          onClick={() => router.push(ROUTES.HOME)}
-          aria-label="Back to home page"
-          className="flex items-center gap-2 text-white/60 hover:text-white text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 rounded-md px-2 py-1"
-        >
-          <Icon name="ChevronLeft" size={16} />
-          Home
-        </button>
-        <button
-          type="button"
-          onClick={() => router.push(ROUTES.LOGIN)}
-          aria-label="Sign out"
-          className="flex items-center gap-2 text-red-400 hover:text-red-300 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 rounded-md px-2 py-1"
-        >
-          <Icon name="LogOut" size={15} />
-          Sign out
-        </button>
-      </div>
+    <div className="h-full bg-brand-navy flex flex-col overflow-hidden">
 
       {/* ── Card ── */}
-      <div className="flex-1 flex items-center justify-center p-4">
+      <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto">
         <div className="w-full max-w-[390px] flex flex-col gap-6 p-8 rounded-2xl bg-white/5 backdrop-blur-sm">
 
           {/* 1. Brand row */}

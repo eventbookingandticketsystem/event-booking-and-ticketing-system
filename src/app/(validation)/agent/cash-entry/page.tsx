@@ -64,7 +64,7 @@ export default function CashEntryPage() {
   if (success) {
     return (
       <div
-        className="w-screen h-screen flex flex-col items-center justify-center gap-4"
+        className="h-full flex flex-col items-center justify-center gap-4"
         style={{ background: "#1A7A4A" }}
         role="status"
         aria-live="assertive"
@@ -80,25 +80,15 @@ export default function CashEntryPage() {
 
   // ── Form ───────────────────────────────────────────────────────────────
   return (
-    <div className="w-screen h-screen bg-brand-navy flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-5 pt-6 pb-4 shrink-0">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          aria-label="Go back"
-          className="w-10 h-10 rounded-full border-2 border-white/20 inline-flex items-center justify-center text-white hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 shrink-0"
-        >
-          <Icon name="ArrowLeft" size={20} />
-        </button>
-        <div>
-          <h1 className="font-display font-bold text-[20px] text-white leading-tight">
-            Manual entry
-          </h1>
-          <p className="text-white/50 text-sm mt-0.5">
-            Record attendance for a walk-in cash payment.
-          </p>
-        </div>
+    <div className="h-full bg-brand-navy flex flex-col overflow-hidden">
+      {/* Section header */}
+      <div className="px-5 pt-5 pb-3 shrink-0">
+        <h1 className="font-display font-bold text-[20px] text-white leading-tight">
+          Manual entry
+        </h1>
+        <p className="text-white/50 text-sm mt-0.5">
+          Record attendance for a walk-in cash payment.
+        </p>
       </div>
 
       {/* Form */}
