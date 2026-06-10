@@ -54,12 +54,25 @@ export default function EventDetailPage({ params }: PageProps) {
       <div className="flex-1 overflow-y-auto">
         {/* Poster hero */}
         <div
-          className="relative h-[240px] md:h-[300px] bg-cover bg-center shrink-0"
-          style={{ backgroundImage: ev.poster }}
+          className="relative h-[240px] md:h-[300px] shrink-0 overflow-hidden"
+          style={{ background: ev.poster }}
         >
+          {/* Photo layer */}
+          {ev.image && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={ev.image}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 w-full h-full object-cover object-center"
+              loading="eager"
+              decoding="async"
+            />
+          )}
+          {/* Gradient overlay */}
           <div
             className="absolute inset-0"
-            style={{ background: "linear-gradient(180deg, rgba(8,40,59,.35) 0%, rgba(8,40,59,0) 30%, rgba(8,40,59,.15) 100%)" }}
+            style={{ background: "linear-gradient(180deg, rgba(8,40,59,.55) 0%, rgba(8,40,59,0.05) 40%, rgba(8,40,59,.4) 100%)" }}
             aria-hidden="true"
           />
           <button

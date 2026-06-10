@@ -58,23 +58,33 @@ export default function PublicEventPreviewPage({ params }: PageProps) {
         <div
           className="relative w-full overflow-hidden flex flex-col justify-end p-7"
           style={{
-            backgroundImage: poster,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
+            background: poster,
             aspectRatio: "16/9",
             maxHeight: 420,
           }}
         >
+          {/* Photo layer */}
+          {ev.image && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={ev.image}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 w-full h-full object-cover object-center"
+              loading="eager"
+              decoding="async"
+            />
+          )}
           {/* Subtle grid pattern */}
           <div
             className="absolute inset-0 pointer-events-none"
-            style={{ backgroundImage: "repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 13px)" }}
+            style={{ backgroundImage: "repeating-linear-gradient(135deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 13px)" }}
             aria-hidden="true"
           />
           {/* Gradient overlay */}
           <div
             className="absolute inset-0"
-            style={{ background: "linear-gradient(to top, rgba(3,9,15,0.92), transparent 65%)" }}
+            style={{ background: "linear-gradient(to top, rgba(3,9,15,0.95), rgba(3,9,15,0.2) 55%, transparent 100%)" }}
             aria-hidden="true"
           />
 
