@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Shared/Icon";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ import { ROUTES } from "@/constants/routes";
 // ── Types ──────────────────────────────────────────────────────────────────
 
 type ResultKind = "admit" | "used" | "invalid" | "wrong" | "expired";
+type CamState   = "requesting" | "active" | "denied" | "unavailable";
 
 interface ScanResult {
   kind: ResultKind;
@@ -57,7 +58,6 @@ const RESULT_CONFIG: Record<ResultKind, {
 };
 
 const DEMO_CYCLE: ResultKind[] = ["admit", "used", "invalid", "wrong", "expired"];
-
 const EVENT_NAME = "Juba Music Festival 2025";
 
 // ── Result Overlay ─────────────────────────────────────────────────────────
@@ -86,15 +86,8 @@ function ResultOverlay({
       aria-live="assertive"
       onClick={onReset}
     >
-      {/* Icon */}
-      <Icon
-        name={cfg.icon}
-        size={64}
-        strokeWidth={2.5}
-        className="text-white"
-      />
+      <Icon name={cfg.icon} size={64} strokeWidth={2.5} className="text-white" />
 
-      {/* Verdict */}
       <h1
         className={cn(
           "font-display font-bold text-white text-center leading-none",
@@ -104,12 +97,9 @@ function ResultOverlay({
         {cfg.verdict}
       </h1>
 
-      {/* Attendee name + tier (admit only) */}
       {cfg.showName && result.name && (
         <div className="flex flex-col items-center gap-2 mt-1">
-          <p className="text-white/90 text-[22px] font-semibold text-center">
-            {result.name}
-          </p>
+          <p className="text-white/90 text-[22px] font-semibold text-center">{result.name}</p>
           {result.tier && (
             <span className="px-4 py-1.5 rounded-pill border-2 border-white/50 text-white text-[15px] font-semibold">
               {result.tier}
@@ -118,14 +108,12 @@ function ResultOverlay({
         </div>
       )}
 
-      {/* Sub text (non-admit) */}
       {!cfg.showName && cfg.sub && (
         <p className="text-white/70 text-[18px] text-center max-w-[280px] leading-snug">
           {cfg.sub}
         </p>
       )}
 
-      {/* Auto-reset countdown */}
       <div className="absolute bottom-8 flex items-center gap-2 text-white/60 text-sm">
         <Icon name="RotateCcw" size={14} />
         Auto-reset in {countdown}s
@@ -146,7 +134,7 @@ function OfflineSyncSheet({
   onClose: () => void;
 }) {
   const [syncPhase, setSyncPhase] = useState<"idle" | "syncing" | "done">("idle");
-  const [syncPct, setSyncPct] = useState(0);
+  const [syncPct,   setSyncPct]   = useState(0);
 
   useEffect(() => {
     if (syncPhase !== "syncing") return;
@@ -159,14 +147,7 @@ function OfflineSyncSheet({
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-black/50"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
-      {/* Sheet */}
+      <div className="fixed inset-0 z-40 bg-black/50" onClick={onClose} aria-hidden="true" />
       <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center">
         <div
           className="w-full max-w-[390px] rounded-t-2xl p-5"
@@ -175,17 +156,13 @@ function OfflineSyncSheet({
           aria-label="Offline sync"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Handle */}
           <div className="w-10 h-1.5 rounded-pill bg-white/20 mx-auto mb-5" aria-hidden="true" />
 
-          <h2 className="font-display font-bold text-[18px] text-white mb-1">
-            Offline mode
-          </h2>
+          <h2 className="font-display font-bold text-[18px] text-white mb-1">Offline mode</h2>
           <p className="text-white/60 text-sm mb-4">
             Scans are saved on this device and uploaded when you reconnect.
           </p>
 
-          {/* Stats */}
           {[
             { label: "Scans recorded locally", value: "38" },
             { label: "Pending sync",            value: syncPhase === "done" ? "0" : "38", highlight: syncPhase === "done" ? "#8fe0ad" : "#f0c878" },
@@ -199,7 +176,6 @@ function OfflineSyncSheet({
             </div>
           ))}
 
-          {/* Sync progress */}
           {syncPhase === "syncing" && (
             <div className="mt-4 flex flex-col gap-2">
               <div className="flex items-center justify-between text-[13px] text-white">
@@ -226,7 +202,6 @@ function OfflineSyncSheet({
             </div>
           )}
 
-          {/* Actions */}
           <div className="flex flex-col gap-3 mt-5">
             <button
               type="button"
@@ -268,14 +243,51 @@ function OfflineSyncSheet({
 // ── Main Scanner Page ──────────────────────────────────────────────────────
 
 export default function ScannerPage() {
-  const router = useRouter();
-  const [online,   setOnline]   = useState(true);
-  const [admitted, setAdmitted] = useState(847);
-  const [result,   setResult]   = useState<ScanResult | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const router   = useRouter();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const [camState,  setCamState]  = useState<CamState>("requesting");
+  const [online,    setOnline]    = useState(true);
+  const [admitted,  setAdmitted]  = useState(847);
+  const [result,    setResult]    = useState<ScanResult | null>(null);
+  const [menuOpen,  setMenuOpen]  = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const cycleRef = useRef(0);
 
+  // ── Start camera ────────────────────────────────────────────────────────
+  const startCamera = useCallback(async () => {
+    setCamState("requesting");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setCamState("active");
+    } catch (err) {
+      const name = (err as Error).name;
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        setCamState("denied");
+      } else {
+        setCamState("unavailable");
+      }
+    }
+  }, []);
+
+  // ── Stop camera on unmount ───────────────────────────────────────────────
+  useEffect(() => {
+    startCamera();
+    return () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, [startCamera]);
+
+  // ── Demo scan logic ──────────────────────────────────────────────────────
   const randName = () =>
     ATTENDEE_NAMES[Math.floor(Math.random() * ATTENDEE_NAMES.length)];
 
@@ -305,19 +317,16 @@ export default function ScannerPage() {
     <div className="w-screen h-screen bg-brand-navy flex flex-col overflow-hidden relative">
 
       {/* ── Top bar ── */}
-      <div className="h-12 flex items-center gap-2 px-4 shrink-0 border-b border-white/8 bg-brand-navy-2/80">
-        {/* Event name */}
+      <div className="h-12 flex items-center gap-2 px-4 shrink-0 border-b border-white/8 bg-brand-navy-2/80 z-20">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <Icon name="Ticket" size={16} className="text-brand-orange shrink-0" />
           <span className="text-white/80 text-sm truncate">{EVENT_NAME}</span>
         </div>
 
-        {/* Admitted count */}
         <span className="font-mono text-white text-sm shrink-0 px-2">
           {admitted.toLocaleString()} <span className="text-white/50">admitted</span>
         </span>
 
-        {/* Connectivity pill */}
         <button
           type="button"
           onClick={handlePillClick}
@@ -333,7 +342,6 @@ export default function ScannerPage() {
           {online ? "Online" : "Offline"}
         </button>
 
-        {/* Menu button */}
         <button
           type="button"
           onClick={() => setMenuOpen((m) => !m)}
@@ -347,47 +355,97 @@ export default function ScannerPage() {
 
       {/* ── Offline banner ── */}
       {!online && (
-        <div className="flex items-center justify-center gap-2 py-2 bg-status-warning-bg text-status-warning text-[13px] font-semibold shrink-0">
+        <div className="flex items-center justify-center gap-2 py-2 bg-status-warning-bg text-status-warning text-[13px] font-semibold shrink-0 z-20">
           <Icon name="WifiOff" size={14} />
           Offline mode — scans saved locally
         </div>
       )}
 
       {/* ── Viewfinder area ── */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-6 relative">
+      <div className="flex-1 flex flex-col items-center justify-center gap-5 relative overflow-hidden">
+
         {/* Camera frame */}
-        <div className="relative w-[260px] h-[260px]">
-          {/* Dark frame */}
-          <div className="w-full h-full rounded-xl border-2 border-white/20 bg-black/40 overflow-hidden relative">
-            {/* Animated scan line */}
+        <div className="relative w-[280px] h-[280px] md:w-[320px] md:h-[320px]">
+
+          {/* Video feed */}
+          <video
+            ref={videoRef}
+            muted
+            playsInline
+            autoPlay
+            aria-label="Camera viewfinder"
+            className={cn(
+              "absolute inset-0 w-full h-full object-cover rounded-xl",
+              camState === "active" ? "opacity-100" : "opacity-0",
+            )}
+          />
+
+          {/* Dark placeholder when camera not active */}
+          {camState !== "active" && (
+            <div className="absolute inset-0 rounded-xl bg-black/60 flex flex-col items-center justify-center gap-3 px-4">
+              {camState === "requesting" && (
+                <>
+                  <svg className="animate-spin h-8 w-8 text-white/40" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                  <p className="text-white/50 text-sm text-center">Requesting camera…</p>
+                </>
+              )}
+              {camState === "denied" && (
+                <>
+                  <Icon name="CameraOff" size={32} className="text-white/30" />
+                  <p className="text-white/60 text-sm text-center leading-snug">
+                    Camera access denied.<br />Enable in browser settings.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={startCamera}
+                    className="mt-1 px-4 py-2 rounded-lg bg-white/10 text-white text-xs font-semibold hover:bg-white/20 transition-colors"
+                  >
+                    Retry
+                  </button>
+                </>
+              )}
+              {camState === "unavailable" && (
+                <>
+                  <Icon name="CameraOff" size={32} className="text-white/30" />
+                  <p className="text-white/60 text-sm text-center leading-snug">
+                    No camera found.<br />Use demo buttons below.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Animated scan line — only when camera active */}
+          {camState === "active" && (
             <div
-              className="absolute left-0 right-0 h-[2px] bg-brand-orange"
-              style={{
-                animation: "scanline 2s linear infinite",
-              }}
+              className="absolute left-2 right-2 h-[2px] bg-brand-orange rounded-full z-10"
+              style={{ animation: "scanline 2s linear infinite" }}
               aria-hidden="true"
             />
-          </div>
+          )}
 
-          {/* Corner brackets — 4 corners */}
+          {/* Corner brackets */}
           {[
-            { top: -1, left: -1, borderTop: true, borderLeft: true },
-            { top: -1, right: -1, borderTop: true, borderRight: true },
-            { bottom: -1, left: -1, borderBottom: true, borderLeft: true },
-            { bottom: -1, right: -1, borderBottom: true, borderRight: true },
+            { top: -1,    left: -1,  borderTop: true,    borderLeft: true    },
+            { top: -1,    right: -1, borderTop: true,    borderRight: true   },
+            { bottom: -1, left: -1,  borderBottom: true, borderLeft: true    },
+            { bottom: -1, right: -1, borderBottom: true, borderRight: true   },
           ].map((pos, i) => (
             <span
               key={i}
-              className="absolute w-[25px] h-[25px]"
+              className="absolute w-[28px] h-[28px] z-10"
               style={{
-                top: pos.top !== undefined ? pos.top : undefined,
-                bottom: pos.bottom !== undefined ? pos.bottom : undefined,
-                left: pos.left !== undefined ? pos.left : undefined,
-                right: pos.right !== undefined ? pos.right : undefined,
-                borderTopWidth: pos.borderTop ? 3 : 0,
+                top:          pos.top    !== undefined ? pos.top    : undefined,
+                bottom:       pos.bottom !== undefined ? pos.bottom : undefined,
+                left:         pos.left   !== undefined ? pos.left   : undefined,
+                right:        pos.right  !== undefined ? pos.right  : undefined,
+                borderTopWidth:    pos.borderTop    ? 3 : 0,
                 borderBottomWidth: pos.borderBottom ? 3 : 0,
-                borderLeftWidth: pos.borderLeft ? 3 : 0,
-                borderRightWidth: pos.borderRight ? 3 : 0,
+                borderLeftWidth:   pos.borderLeft   ? 3 : 0,
+                borderRightWidth:  pos.borderRight  ? 3 : 0,
                 borderColor: "#FF5A00",
                 borderStyle: "solid",
               }}
@@ -398,21 +456,25 @@ export default function ScannerPage() {
 
         {/* Hint text */}
         <p className="text-white/50 text-sm text-center">
-          Point camera at a QR code
+          {camState === "active"
+            ? "Point camera at a ticket QR code"
+            : camState === "denied"
+            ? "Camera access required for scanning"
+            : "Use demo buttons to simulate a scan"}
         </p>
 
-        {/* Scan button */}
+        {/* Main scan button */}
         <button
           type="button"
           onClick={handleScan}
           aria-label="Scan QR code"
-          className="flex items-center justify-center gap-2 w-full max-w-[260px] h-[52px] rounded-xl bg-brand-orange text-white font-display font-bold text-[16px] hover:bg-brand-orange-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
+          className="flex items-center justify-center gap-2 w-full max-w-[280px] h-[52px] rounded-xl bg-brand-orange text-white font-display font-bold text-[16px] hover:bg-brand-orange-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
         >
           <Icon name="ScanLine" size={20} />
           Scan QR
         </button>
 
-        {/* Demo sim buttons */}
+        {/* Demo outcome buttons */}
         <div className="flex flex-wrap gap-2 justify-center px-4" role="group" aria-label="Simulate specific result">
           {(["admit", "used", "invalid", "wrong", "expired"] as ResultKind[]).map((k) => (
             <button
@@ -431,17 +493,13 @@ export default function ScannerPage() {
       {/* ── Menu dropdown ── */}
       {menuOpen && (
         <>
-          <div
-            className="fixed inset-0 z-30"
-            onClick={() => setMenuOpen(false)}
-            aria-hidden="true"
-          />
+          <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} aria-hidden="true" />
           <div className="absolute top-12 right-2 z-40 w-52 bg-surface border border-border rounded-lg shadow-pop overflow-hidden">
             {[
-              { icon: "Wallet"     as const, label: "Manual cash entry",    action: () => router.push(ROUTES.AGENT_CASH) },
-              { icon: "RefreshCw"  as const, label: "Sync offline scans",   action: () => { setSheetOpen(true); setMenuOpen(false); } },
-              { icon: "House"      as const, label: "Back to home",         action: () => router.push(ROUTES.HOME) },
-              { icon: "LogOut"     as const, label: "Sign out",             action: () => router.push(ROUTES.LOGIN) },
+              { icon: "Wallet"    as const, label: "Manual cash entry",    action: () => router.push(ROUTES.AGENT_CASH) },
+              { icon: "RefreshCw" as const, label: "Sync offline scans",   action: () => { setSheetOpen(true); setMenuOpen(false); } },
+              { icon: "House"     as const, label: "Back to home",         action: () => router.push(ROUTES.HOME) },
+              { icon: "LogOut"    as const, label: "Sign out",             action: () => router.push(ROUTES.LOGIN) },
             ].map((item, i) => (
               <button
                 key={item.label}
@@ -478,8 +536,9 @@ export default function ScannerPage() {
       {/* Scan line animation */}
       <style>{`
         @keyframes scanline {
-          0%   { top: 0%; }
-          100% { top: 100%; }
+          0%   { top: 8px; }
+          50%  { top: calc(100% - 10px); }
+          100% { top: 8px; }
         }
       `}</style>
     </div>
