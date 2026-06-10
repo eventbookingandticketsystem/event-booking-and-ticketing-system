@@ -32,10 +32,10 @@ export default function HomePage() {
           onRegister={handleRegister}
           onExplore={handleExplore}
         />
+        <FeaturedEvents />
         <HowItWorks />
         <Features />
         <EventTypes />
-        <FeaturedEvents />
         <CtaBand onSignIn={handleSignIn} onRegister={handleRegister} />
       </main>
 
