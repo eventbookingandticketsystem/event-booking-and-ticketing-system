@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useRouter, usePathname } from "next/navigation";
 import { OrgSidebar } from "@/components/Organizer/OrgSidebar";
@@ -6,6 +6,7 @@ import { Icon } from "@/components/Shared/Icon";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
 import { type icons } from "lucide-react";
+import AuthProvider from "../auth/AuthProvider";
 
 // ── Nav config ────────────────────────────────────────────────────────────
 
@@ -18,37 +19,62 @@ interface NavItem {
 
 // Bottom nav shows the 5 most important items (Settings/Create tucked away)
 const MOBILE_NAV: NavItem[] = [
-  { id: "dashboard", label: "Dashboard",  icon: "LayoutDashboard", route: "/organizer" },
-  { id: "events",    label: "Events",     icon: "CalendarDays",    route: "/organizer/events" },
-  { id: "create",    label: "Create",     icon: "CirclePlus",      route: "/organizer/events/create" },
-  { id: "agents",    label: "Agents",     icon: "Users",           route: "/organizer/gate-agents" },
-  { id: "reports",   label: "Reports",    icon: "ChartBar",        route: "/organizer/reports" },
+  {
+    id: "dashboard",
+    label: "Dashboard",
+    icon: "LayoutDashboard",
+    route: "/organizer",
+  },
+  {
+    id: "events",
+    label: "Events",
+    icon: "CalendarDays",
+    route: "/organizer/events",
+  },
+  {
+    id: "create",
+    label: "Create",
+    icon: "CirclePlus",
+    route: "/organizer/events/create",
+  },
+  {
+    id: "agents",
+    label: "Agents",
+    icon: "Users",
+    route: "/organizer/gate-agents",
+  },
+  {
+    id: "reports",
+    label: "Reports",
+    icon: "ChartBar",
+    route: "/organizer/reports",
+  },
 ];
 
 const NAV_ROUTES: Record<string, string> = {
   dashboard: "/organizer",
-  events:    "/organizer/events",
-  create:    "/organizer/events/create",
-  agents:    "/organizer/gate-agents",
-  reports:   "/organizer/reports",
-  settings:  "/organizer/settings",
+  events: "/organizer/events",
+  create: "/organizer/events/create",
+  agents: "/organizer/gate-agents",
+  reports: "/organizer/reports",
+  settings: "/organizer/settings",
 };
 
 const NAV_LABELS: Record<string, string> = {
   dashboard: "Dashboard",
-  events:    "My Events",
-  create:    "Create Event",
-  agents:    "Gate Agents",
-  reports:   "Reports",
-  settings:  "Settings",
+  events: "My Events",
+  create: "Create Event",
+  agents: "Gate Agents",
+  reports: "Reports",
+  settings: "Settings",
 };
 
 function getActiveNav(pathname: string): string {
   if (pathname.startsWith("/organizer/events/create")) return "create";
-  if (pathname.startsWith("/organizer/events"))        return "events";
-  if (pathname.startsWith("/organizer/gate-agents"))   return "agents";
-  if (pathname.startsWith("/organizer/reports"))       return "reports";
-  if (pathname.startsWith("/organizer/settings"))      return "settings";
+  if (pathname.startsWith("/organizer/events")) return "events";
+  if (pathname.startsWith("/organizer/gate-agents")) return "agents";
+  if (pathname.startsWith("/organizer/reports")) return "reports";
+  if (pathname.startsWith("/organizer/settings")) return "settings";
   return "dashboard";
 }
 
@@ -63,7 +89,9 @@ function MobileTopBar({ label }: { label: string }) {
         <span className="w-7 h-7 rounded-sm bg-brand-orange inline-flex items-center justify-center shrink-0">
           <Icon name="Ticket" size={14} className="text-white" />
         </span>
-        <span className="font-display font-bold text-[15px] text-text leading-none">Tiketi</span>
+        <span className="font-display font-bold text-[15px] text-text leading-none">
+          Tiketi
+        </span>
       </div>
 
       {/* Page label */}
@@ -119,7 +147,9 @@ function MobileBottomNav({
             aria-label={item.label}
             className={cn(
               "flex flex-col items-center gap-[3px] py-2 px-1 text-[11px] font-semibold font-body rounded-sm transition-colors",
-              isActive ? "text-brand-orange" : "text-text-muted hover:text-text-secondary",
+              isActive
+                ? "text-brand-orange"
+                : "text-text-muted hover:text-text-secondary",
             )}
           >
             <Icon name={item.icon} size={21} />
@@ -138,8 +168,8 @@ export default function ManagementLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const router    = useRouter();
-  const pathname  = usePathname();
+  const router = useRouter();
+  const pathname = usePathname();
   const activeNav = getActiveNav(pathname);
 
   const handleNav = (id: string) => {
@@ -150,7 +180,7 @@ export default function ManagementLayout({
   const pageLabel = NAV_LABELS[activeNav] ?? "Dashboard";
 
   return (
-    <>
+    <AuthProvider>
       {/* ── MOBILE (< lg) — top bar + scrollable content + fixed bottom nav ── */}
       <div className="flex lg:hidden flex-col min-h-screen bg-surface-bg">
         {/* Sticky top bar */}
@@ -159,9 +189,7 @@ export default function ManagementLayout({
         </div>
 
         {/* Scrollable content */}
-        <main className="flex-1 overflow-y-auto pb-16">
-          {children}
-        </main>
+        <main className="flex-1 overflow-y-auto pb-16">{children}</main>
 
         {/* Fixed bottom nav */}
         <div className="fixed bottom-0 left-0 right-0 z-30">
@@ -180,6 +208,6 @@ export default function ManagementLayout({
           </main>
         </div>
       </div>
-    </>
+    </AuthProvider>
   );
 }

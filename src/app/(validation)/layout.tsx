@@ -1,10 +1,11 @@
-'use client';
+"use client";
 
 import { useRouter, usePathname } from "next/navigation";
 import { Icon } from "@/components/Shared/Icon";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
 import { type icons } from "lucide-react";
+import AuthProvider from "../auth/AuthProvider";
 
 // ── Nav config ────────────────────────────────────────────────────────────
 
@@ -16,21 +17,31 @@ interface NavItem {
 }
 
 const AGENT_NAV: NavItem[] = [
-  { id: "selector", label: "Events",  icon: "CalendarDays", route: ROUTES.AGENT      },
-  { id: "scanner",  label: "Scanner", icon: "ScanLine",     route: ROUTES.AGENT_SCAN },
-  { id: "cash",     label: "Cash",    icon: "Wallet",       route: ROUTES.AGENT_CASH },
+  {
+    id: "selector",
+    label: "Events",
+    icon: "CalendarDays",
+    route: ROUTES.AGENT,
+  },
+  {
+    id: "scanner",
+    label: "Scanner",
+    icon: "ScanLine",
+    route: ROUTES.AGENT_SCAN,
+  },
+  { id: "cash", label: "Cash", icon: "Wallet", route: ROUTES.AGENT_CASH },
 ];
 
 function getActiveTab(pathname: string): string {
-  if (pathname.startsWith("/agent/scanner"))    return "scanner";
+  if (pathname.startsWith("/agent/scanner")) return "scanner";
   if (pathname.startsWith("/agent/cash-entry")) return "cash";
   return "selector";
 }
 
 const PAGE_LABELS: Record<string, string> = {
   selector: "Select Event",
-  scanner:  "QR Scanner",
-  cash:     "Cash Entry",
+  scanner: "QR Scanner",
+  cash: "Cash Entry",
 };
 
 // ── Top bar ───────────────────────────────────────────────────────────────
@@ -70,11 +81,7 @@ function AgentTopBar({ label }: { label: string }) {
 
 // ── Bottom nav ────────────────────────────────────────────────────────────
 
-function AgentBottomNav({
-  active,
-}: {
-  active: string;
-}) {
+function AgentBottomNav({ active }: { active: string }) {
   const router = useRouter();
   return (
     <nav
@@ -113,22 +120,22 @@ export default function ValidationLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname  = usePathname();
+  const pathname = usePathname();
   const activeTab = getActiveTab(pathname);
   const pageLabel = PAGE_LABELS[activeTab] ?? "Scanner";
 
   return (
-    <div className="w-screen h-screen bg-brand-navy flex flex-col overflow-hidden">
-      {/* Shared top bar across all agent screens */}
-      <AgentTopBar label={pageLabel} />
+    <AuthProvider>
+      <div className="w-screen h-screen bg-brand-navy flex flex-col overflow-hidden">
+        {/* Shared top bar across all agent screens */}
+        <AgentTopBar label={pageLabel} />
 
-      {/* Page content fills remaining height */}
-      <div className="flex-1 overflow-hidden">
-        {children}
+        {/* Page content fills remaining height */}
+        <div className="flex-1 overflow-hidden">{children}</div>
+
+        {/* Shared bottom nav */}
+        <AgentBottomNav active={activeTab} />
       </div>
-
-      {/* Shared bottom nav */}
-      <AgentBottomNav active={activeTab} />
-    </div>
+    </AuthProvider>
   );
 }

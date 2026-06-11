@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -8,6 +8,7 @@ import { Icon } from "@/components/Shared/Icon";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
 import { type icons } from "lucide-react";
+import AuthProvider from "../auth/AuthProvider";
 
 // ── Nav config ────────────────────────────────────────────────────────────
 
@@ -18,21 +19,21 @@ interface NavItem {
 }
 
 const ADMIN_NAV: NavItem[] = [
-  { id: "overview",   label: "Overview",  icon: "LayoutDashboard" },
-  { id: "organizers", label: "Orgs",      icon: "Building2"       },
-  { id: "events",     label: "Events",    icon: "CalendarDays"    },
-  { id: "gateagents", label: "Agents",    icon: "Users"           },
-  { id: "health",     label: "Health",    icon: "Activity"        },
-  { id: "settings",   label: "Settings",  icon: "Settings"        },
+  { id: "overview", label: "Overview", icon: "LayoutDashboard" },
+  { id: "organizers", label: "Orgs", icon: "Building2" },
+  { id: "events", label: "Events", icon: "CalendarDays" },
+  { id: "gateagents", label: "Agents", icon: "Users" },
+  { id: "health", label: "Health", icon: "Activity" },
+  { id: "settings", label: "Settings", icon: "Settings" },
 ];
 
 const NAV_LABELS: Record<string, string> = {
-  overview:   "Overview",
+  overview: "Overview",
   organizers: "Organizers",
-  events:     "Events",
+  events: "Events",
   gateagents: "Gate Agents",
-  health:     "System Health",
-  settings:   "Settings",
+  health: "System Health",
+  settings: "Settings",
 };
 
 // ── Mobile top bar ────────────────────────────────────────────────────────
@@ -46,7 +47,9 @@ function MobileTopBar({ label }: { label: string }) {
         <span className="w-7 h-7 rounded-sm bg-brand-orange inline-flex items-center justify-center shrink-0">
           <Icon name="Ticket" size={14} className="text-white" />
         </span>
-        <span className="font-display font-bold text-[15px] text-text leading-none">Tiketi</span>
+        <span className="font-display font-bold text-[15px] text-text leading-none">
+          Tiketi
+        </span>
       </div>
 
       {/* Page label (centered) */}
@@ -97,7 +100,9 @@ function MobileBottomNav({
             aria-label={item.label}
             className={cn(
               "flex flex-col items-center gap-0.75 py-2 px-0.5 text-[10px] font-semibold font-body rounded-sm transition-colors",
-              isActive ? "text-brand-orange" : "text-text-muted hover:text-text-secondary",
+              isActive
+                ? "text-brand-orange"
+                : "text-text-muted hover:text-text-secondary",
             )}
           >
             <Icon name={item.icon} size={20} />
@@ -111,13 +116,17 @@ function MobileBottomNav({
 
 // ── Layout ────────────────────────────────────────────────────────────────
 
-export default function SystemLayout({ children }: { children: React.ReactNode }) {
+export default function SystemLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [nav, setNav] = useState("overview");
 
   const crumb = NAV_LABELS[nav] ?? "Overview";
 
   return (
-    <>
+    <AuthProvider>
       {/* ── MOBILE (< lg) — sticky top bar + scrollable content + fixed bottom nav ── */}
       <div className="flex lg:hidden flex-col min-h-screen bg-surface-bg">
         {/* Sticky top bar */}
@@ -126,9 +135,7 @@ export default function SystemLayout({ children }: { children: React.ReactNode }
         </div>
 
         {/* Scrollable content — pad bottom so last item clears the nav bar */}
-        <main className="flex-1 overflow-y-auto pb-16">
-          {children}
-        </main>
+        <main className="flex-1 overflow-y-auto pb-16">{children}</main>
 
         {/* Fixed bottom nav */}
         <div className="fixed bottom-0 left-0 right-0 z-30">
@@ -141,11 +148,9 @@ export default function SystemLayout({ children }: { children: React.ReactNode }
         <AdminSidebar active={nav} onNav={setNav} />
         <div className="flex flex-col flex-1 min-w-0 h-screen">
           <AdminTopbar crumb={crumb} onCrumbRoot={() => setNav("overview")} />
-          <main className="flex-1 overflow-y-auto">
-            {children}
-          </main>
+          <main className="flex-1 overflow-y-auto">{children}</main>
         </div>
       </div>
-    </>
+    </AuthProvider>
   );
 }

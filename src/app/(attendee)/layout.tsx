@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useRouter, usePathname } from "next/navigation";
 import { Icon } from "@/components/Shared/Icon";
@@ -6,22 +6,27 @@ import { BottomNav, type AttendeeTab } from "@/components/Attendee/BottomNav";
 import { ROUTES } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 import { type icons } from "lucide-react";
+import AuthProvider from "../auth/AuthProvider";
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
 function getActiveTab(pathname: string): AttendeeTab {
   if (pathname.startsWith("/dashboard/tickets")) return "tickets";
-  if (pathname.startsWith("/dashboard/account"))  return "account";
-  if (pathname.includes("?tab=discover"))          return "discover";
+  if (pathname.startsWith("/dashboard/account")) return "account";
+  if (pathname.includes("?tab=discover")) return "discover";
   return "home";
 }
 
 function tabRoute(tab: AttendeeTab): string {
   switch (tab) {
-    case "home":     return ROUTES.DASHBOARD;
-    case "discover": return ROUTES.DASHBOARD + "?tab=discover";
-    case "tickets":  return ROUTES.TICKETS;
-    case "account":  return ROUTES.ACCOUNT;
+    case "home":
+      return ROUTES.DASHBOARD;
+    case "discover":
+      return ROUTES.DASHBOARD + "?tab=discover";
+    case "tickets":
+      return ROUTES.TICKETS;
+    case "account":
+      return ROUTES.ACCOUNT;
   }
 }
 
@@ -34,10 +39,10 @@ interface SidebarItem {
 }
 
 const SIDEBAR_NAV: SidebarItem[] = [
-  { id: "home",     label: "Home",       icon: "House"   },
-  { id: "discover", label: "Discover",   icon: "Compass" },
-  { id: "tickets",  label: "My Tickets", icon: "Ticket"  },
-  { id: "account",  label: "Account",    icon: "User"    },
+  { id: "home", label: "Home", icon: "House" },
+  { id: "discover", label: "Discover", icon: "Compass" },
+  { id: "tickets", label: "My Tickets", icon: "Ticket" },
+  { id: "account", label: "Account", icon: "User" },
 ];
 
 function AttendeeSidebar({
@@ -57,13 +62,20 @@ function AttendeeSidebar({
           <Icon name="Ticket" size={17} className="text-white" />
         </span>
         <div>
-          <div className="font-display font-bold text-[16px] text-white leading-none">Tiketi</div>
-          <div className="text-[11px] text-white/50 mt-0.5 font-body">Attendee</div>
+          <div className="font-display font-bold text-[16px] text-white leading-none">
+            Tiketi
+          </div>
+          <div className="text-[11px] text-white/50 mt-0.5 font-body">
+            Attendee
+          </div>
         </div>
       </div>
 
       {/* Main nav */}
-      <nav className="flex-1 px-3 flex flex-col gap-0.5" aria-label="Attendee navigation">
+      <nav
+        className="flex-1 px-3 flex flex-col gap-0.5"
+        aria-label="Attendee navigation"
+      >
         {SIDEBAR_NAV.map((item) => {
           const isActive = active === item.id;
           return (
@@ -118,10 +130,10 @@ function AttendeeSidebar({
 // ── Desktop top bar ───────────────────────────────────────────────────────────
 
 const TAB_LABELS: Record<AttendeeTab, string> = {
-  home:     "Home",
+  home: "Home",
   discover: "Discover",
-  tickets:  "My Tickets",
-  account:  "Account",
+  tickets: "My Tickets",
+  account: "Account",
 };
 
 function AttendeeTopbar({ active }: { active: AttendeeTab }) {
@@ -156,7 +168,7 @@ export default function AttendeeLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const router   = useRouter();
+  const router = useRouter();
   const pathname = usePathname();
   const activeTab = getActiveTab(pathname);
 
@@ -165,14 +177,12 @@ export default function AttendeeLayout({
   };
 
   return (
-    <>
+    <AuthProvider>
       {/* ── MOBILE (< 768px) — unchanged narrow phone shell ── */}
       <div className="flex md:hidden min-h-screen bg-surface-bg flex-col items-center">
         <div className="w-full max-w-[390px] flex flex-col min-h-screen bg-surface-bg relative">
           {/* Scrollable content */}
-          <main className="flex-1 overflow-y-auto pb-16">
-            {children}
-          </main>
+          <main className="flex-1 overflow-y-auto pb-16">{children}</main>
           {/* Fixed bottom nav */}
           <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] z-30">
             <BottomNav activeTab={activeTab} onTab={handleTab} />
@@ -187,11 +197,9 @@ export default function AttendeeLayout({
         {/* Right column: topbar fixed + scrollable content */}
         <div className="flex flex-col flex-1 min-w-0 h-screen">
           <AttendeeTopbar active={activeTab} />
-          <main className="flex-1 overflow-y-auto">
-            {children}
-          </main>
+          <main className="flex-1 overflow-y-auto">{children}</main>
         </div>
       </div>
-    </>
+    </AuthProvider>
   );
 }
