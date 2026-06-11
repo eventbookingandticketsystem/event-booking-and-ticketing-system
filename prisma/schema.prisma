@@ -7,6 +7,63 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum UserRole {
+  ATTENDEE
+  ORGANIZER
+  GATE_AGENT
+  ADMIN
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  EXPIRED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  MTN
+  AIRTEL
+  CASH
+}
+
+enum TicketStatus {
+  VALID
+  USED
+  EXPIRED
+  CANCELLED
+}
+
+enum ScanResult {
+  ADMIT
+  ALREADY_USED
+  INVALID
+  WRONG_EVENT
+  EXPIRED
+}
+
+enum AgentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// ─────────────────────────────────────────────
+// AUTH MODELS (unchanged from NextAuth scaffold)
+// ─────────────────────────────────────────────
+
 model User {
   id            String          @id @default(auto()) @map("_id") @db.ObjectId
   name          String?
@@ -16,8 +73,15 @@ model User {
   password      String?
   accounts      Account[]
   sessions      Session[]
-  // Optional for WebAuthn support
   Authenticator Authenticator[]
+
+  // App-level fields
+  phone        String?
+  role         UserRole?    @default(ATTENDEE)
+  orgProfile   OrgProfile?
+  agentProfile AgentProfile?
+  tickets      Ticket[]
+  bookings     Booking[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -65,7 +129,6 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// Optional for WebAuthn support
 model Authenticator {
   credentialID         String  @id @map("_id")
   userId               String  @db.ObjectId
@@ -79,4 +142,255 @@ model Authenticator {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, credentialID])
+}
+
+// ─────────────────────────────────────────────
+// ORGANIZER PROFILE
+// ─────────────────────────────────────────────
+
+model OrgProfile {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @unique @db.ObjectId
+  orgName     String
+  contactName String
+  phone       String
+  revenue     Float    @default(0)
+  status      String   @default("Active") // "Active" | "Suspended"
+  joinedAt    DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events Event[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// EVENT
+// ─────────────────────────────────────────────
+
+model Event {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  venue       String
+  city        String      @default("Juba")
+  date        DateTime
+  time        String
+  category    String
+  poster      String?     // CSS gradient string
+  image       String?     // photo URL
+  organizer   String      // display name (denormalised for speed)
+  about       String?
+  status      EventStatus @default(DRAFT)
+  featured    Boolean     @default(false)
+
+  // optional link to organizer account
+  orgProfileId String?    @db.ObjectId
+  orgProfile   OrgProfile? @relation(fields: [orgProfileId], references: [id])
+
+  tiers      TicketTier[]
+  bookings   Booking[]
+  tickets    Ticket[]
+  scans      ScanRecord[]
+  gateAgents GateAgent[]
+  entryRate  EntryRatePoint[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// TICKET TIER
+// ─────────────────────────────────────────────
+
+model TicketTier {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  eventId   String  @db.ObjectId
+  name      String
+  price     Float
+  capacity  Int
+  remaining Int
+  lowStock  Boolean @default(false)
+  soldOut   Boolean @default(false)
+
+  saleOpens  DateTime?
+  saleCloses DateTime?
+
+  event        Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  bookingLines BookingLine[]
+  tickets      Ticket[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// BOOKING
+// ─────────────────────────────────────────────
+
+model Booking {
+  id         String        @id @default(auto()) @map("_id") @db.ObjectId
+  ref        String        @unique // "BKG-XXXXXXXX"
+  userId     String        @db.ObjectId
+  eventId    String        @db.ObjectId
+  method     PaymentMethod
+  subtotal   Float
+  serviceFee Float         @default(1)
+  total      Float
+  status     BookingStatus @default(PENDING)
+  ussdCode   String?
+  paidAt     DateTime?
+
+  user    User          @relation(fields: [userId], references: [id])
+  event   Event         @relation(fields: [eventId], references: [id])
+  lines   BookingLine[]
+  tickets Ticket[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// BOOKING LINE
+// ─────────────────────────────────────────────
+
+model BookingLine {
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  bookingId String @db.ObjectId
+  tierId    String @db.ObjectId
+  qty       Int
+  unitPrice Float
+  subtotal  Float
+
+  booking Booking    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  tier    TicketTier @relation(fields: [tierId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// TICKET
+// ─────────────────────────────────────────────
+
+model Ticket {
+  id         String       @id @default(auto()) @map("_id") @db.ObjectId
+  ticketRef  String       @unique // "TIX-XXXX-XXXX"
+  tier       String       // tier name at time of issue (denormalised)
+  status     TicketStatus @default(VALID)
+  qrPayload  String       @unique // signed token for QR generation
+  issuedAt   DateTime     @default(now())
+  usedAt     DateTime?
+  expiresAt  DateTime?
+
+  ownerId    String @db.ObjectId
+  eventId    String @db.ObjectId
+  bookingId  String @db.ObjectId
+  tierId     String @db.ObjectId
+
+  owner     User       @relation(fields: [ownerId], references: [id])
+  event     Event      @relation(fields: [eventId], references: [id])
+  booking   Booking    @relation(fields: [bookingId], references: [id])
+  tierModel TicketTier @relation(fields: [tierId], references: [id])
+  scans     ScanRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// GATE AGENT
+// ─────────────────────────────────────────────
+
+model GateAgent {
+  id           String      @id @default(auto()) @map("_id") @db.ObjectId
+  eventId      String      @db.ObjectId
+  userId       String?     @db.ObjectId  // optional — agent may not have an account
+  name         String
+  phone        String
+  gate         String      // "Gate A", "Turnstile 2", etc.
+  status       AgentStatus @default(ACTIVE)
+  lastActiveAt DateTime?
+  scansToday   Int         @default(0)
+
+  event  Event        @relation(fields: [eventId], references: [id])
+  scans  ScanRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// SCAN RECORD
+// ─────────────────────────────────────────────
+
+model ScanRecord {
+  id         String     @id @default(auto()) @map("_id") @db.ObjectId
+  eventId    String     @db.ObjectId
+  agentId    String     @db.ObjectId
+  ticketId   String?    @db.ObjectId  // null if ticket not found
+  ticketRef  String?    // raw scanned value
+  gate       String
+  result     ScanResult
+  note       String?    // rejection reason
+  scannedAt  DateTime   @default(now())
+
+  event   Event      @relation(fields: [eventId], references: [id])
+  agent   GateAgent  @relation(fields: [agentId], references: [id])
+  ticket  Ticket?    @relation(fields: [ticketId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// AGENT PROFILE (linked to User account)
+// ─────────────────────────────────────────────
+
+model AgentProfile {
+  id           String      @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String      @unique @db.ObjectId
+  phone        String?
+  assignedGate String?
+  status       AgentStatus @default(ACTIVE)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// ENTRY RATE POINT (organizer dashboard chart)
+// ─────────────────────────────────────────────
+
+model EntryRatePoint {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  eventId    String   @db.ObjectId
+  time       String   // "17:00"
+  count      Int
+  recordedAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// SYSTEM LOG (admin health screen)
+// ─────────────────────────────────────────────
+
+model SystemLog {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  service    String
+  code       String
+  message    String
+  resolved   Boolean   @default(false)
+  resolvedAt DateTime?
+  occurredAt DateTime  @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
