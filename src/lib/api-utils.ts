@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { randomBytes } from "crypto";
 
 export function ok<T>(data: T, status = 200) {
   return NextResponse.json({ success: true, data }, { status });
@@ -47,4 +48,15 @@ export function paginated<T>(
       totalPages: Math.ceil(total / limit),
     },
   });
+}
+
+/** "BKG-" + 8 uppercase hex chars  e.g. "BKG-A3F2C901" */
+export function generateBookingRef(): string {
+  return "BKG-" + randomBytes(4).toString("hex").toUpperCase();
+}
+
+/** "TIX-XXXX-XXXX"  e.g. "TIX-7K2M-9QX4" */
+export function generateTicketRef(): string {
+  const part = () => randomBytes(2).toString("hex").toUpperCase();
+  return `TIX-${part()}-${part()}`;
 }
