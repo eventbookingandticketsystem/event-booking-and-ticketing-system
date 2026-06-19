@@ -75,14 +75,8 @@ export function ExploreFilters({
             className="inline-flex items-center gap-[9px] px-3.5 py-2 rounded-pill text-sm font-semibold text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
             style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
           >
-            <span
-              className="inline-flex items-center justify-center w-[26px] h-[18px] rounded-[3px] text-white text-[10px] font-bold"
-              style={{ background: "#0F47AF" }}
-              aria-hidden="true"
-            >
-              SS
-            </span>
-            {city === "All Cities" ? "All Cities" : `${city}, South Sudan`}
+            <Icon name="MapPin" size={14} className="text-white/60" aria-hidden="true" />
+            {city === "All Cities" ? "All Cities" : city}
             <Icon name="ChevronDown" size={15} />
           </button>
 

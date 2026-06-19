@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { AdminSidebar } from "@/components/Admin/AdminSidebar";
 import { AdminTopbar } from "@/components/Admin/AdminTopbar";
 import { Icon } from "@/components/Shared/Icon";
@@ -65,7 +66,7 @@ function MobileTopBar({ label }: { label: string }) {
         <button
           type="button"
           aria-label="Sign out"
-          onClick={() => router.push(ROUTES.LOGIN)}
+          onClick={() => signOut({ redirect: true, callbackUrl: "/login" })}
           className="w-8 h-8 rounded-full bg-brand-navy inline-flex items-center justify-center text-[12px] font-bold text-white font-body shrink-0 hover:bg-brand-navy-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
         >
           SA

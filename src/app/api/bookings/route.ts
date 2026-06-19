@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
       ...(statusParam && { status: statusParam as Prisma.EnumBookingStatusFilter }),
     };
 
-    const [bookings, total] = await prisma.$transaction([
+    const [bookings, total] = await Promise.all([
       prisma.booking.findMany({
         where,
         skip,

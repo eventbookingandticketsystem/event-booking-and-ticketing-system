@@ -255,25 +255,6 @@ export default function GateSelectorPage() {
                 </div>
               )}
 
-              {/* State toggle pills (demo) */}
-              <div className="flex gap-2" role="group" aria-label="Demo state selector">
-                {(["ready", "downloading", "failed"] as Phase[]).map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => { setPhase(s); if (s === "downloading") setPct(0); }}
-                    className={cn(
-                      "flex-1 h-8 rounded-pill text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50",
-                      phase === s
-                        ? "bg-white text-brand-navy"
-                        : "bg-white/10 text-white/50 hover:bg-white/16",
-                    )}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-
               {/* Start scanning */}
               <button
                 type="button"

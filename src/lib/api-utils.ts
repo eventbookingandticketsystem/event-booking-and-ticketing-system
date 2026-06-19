@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { randomBytes } from "crypto";
+import { getToken } from "next-auth/jwt";
 
 export function ok<T>(data: T, status = 200) {
   return NextResponse.json({ success: true, data }, { status });
@@ -59,4 +61,19 @@ export function generateBookingRef(): string {
 export function generateTicketRef(): string {
   const part = () => randomBytes(2).toString("hex").toUpperCase();
   return `TIX-${part()}-${part()}`;
+}
+
+/** Returns the JWT token if the caller is ADMIN, else null. */
+export async function requireAdmin(req: NextRequest) {
+  const token = await getToken({ req });
+  if (!token?.id || token.role !== "ADMIN") return null;
+  return token;
+}
+
+/** Returns the JWT token if the caller is ORGANIZER, else null.
+ *  The route is responsible for resolving orgProfile after this check. */
+export async function requireOrganizer(req: NextRequest) {
+  const token = await getToken({ req });
+  if (!token?.id || token.role !== "ORGANIZER") return null;
+  return token;
 }

@@ -2,12 +2,14 @@
 
 import { useState, use, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { notFound } from "next/navigation";
 import { Button } from "@/components/Shared/Button";
+import { AlertBanner } from "@/components/Shared/AlertBanner";
+import { SkeletonCard } from "@/components/Shared/SkeletonCard";
 import { Icon } from "@/components/Shared/Icon";
 import { formatSSP } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import { EVENT_BY_ID } from "@/lib/mock-data";
+import { useEvent } from "@/lib/api/hooks/useEvent";
+import { useCreateBooking } from "@/lib/api/hooks/useCreateBooking";
 import { ROUTES } from "@/constants/routes";
 import type { TicketTier } from "@/types/event";
 
@@ -25,8 +27,8 @@ export default function BookingPage({ params }: PageProps) {
   const { id } = use(params);
   const router = useRouter();
 
-  const ev = EVENT_BY_ID[id];
-  if (!ev) notFound();
+  const { data: ev, isLoading: evLoading, isError: evError } = useEvent(id);
+  const createBooking = useCreateBooking();
 
   const [lines, setLines] = useState<BookingLine[]>([]);
   const [method, setMethod] = useState<"mtn" | "airtel">("mtn");
@@ -41,9 +43,12 @@ export default function BookingPage({ params }: PageProps) {
         return;
       }
     } catch { /* ignore */ }
-    const firstAvail = ev.tiers.find((t) => !t.soldOut && t.remaining > 0);
-    if (firstAvail) setLines([{ ...firstAvail, qty: 1 }]);
-  }, [id, ev.tiers]);
+    // Fallback: pick first available tier from the fetched event
+    if (ev) {
+      const firstAvail = ev.tiers.find((t) => !t.soldOut && t.remaining > 0);
+      if (firstAvail) setLines([{ ...firstAvail, qty: 1 }]);
+    }
+  }, [id, ev]);
 
   const setQty = (tierId: string, delta: number) => {
     setLines((prev) =>
@@ -56,13 +61,71 @@ export default function BookingPage({ params }: PageProps) {
   const subtotal = lines.reduce((s, l) => s + l.qty * l.price, 0);
   const total = subtotal + SERVICE_FEE;
 
-  const handleConfirm = () => {
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem("tiketi-method", method);
-      sessionStorage.setItem("tiketi-total", String(total));
+  const apiMethod = method === "mtn" ? "MTN" : "AIRTEL";
+
+  const handleConfirm = async () => {
+    if (!ev || lines.length === 0) return;
+
+    try {
+      const booking = await createBooking.mutateAsync({
+        eventId: id,
+        lines: lines.map((l) => ({ tierId: l.id, qty: l.qty })),
+        method: apiMethod,
+      });
+
+      // Persist booking data for payment + confirmation pages
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("tiketi-booking-id",    booking.id);
+        sessionStorage.setItem("tiketi-booking-ref",   booking.ref);
+        sessionStorage.setItem("tiketi-method",        method);
+        sessionStorage.setItem("tiketi-total",         String(booking.total));
+        sessionStorage.setItem("tiketi-event-title",   booking.event?.title ?? ev.title);
+        sessionStorage.setItem("tiketi-event-date",    booking.event?.date  ?? ev.date);
+        sessionStorage.setItem("tiketi-ticket-count",  String(booking.tickets?.length ?? lines.reduce((a, l) => a + l.qty, 0)));
+      }
+      router.push(ROUTES.PAYMENT(id));
+    } catch {
+      // Error is surfaced via createBooking.error — already displayed in the banner
     }
-    router.push(ROUTES.PAYMENT(id));
   };
+
+  // ── Loading skeleton ───────────────────────────────────────────────────────
+  if (evLoading) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex md:hidden items-center gap-3 px-[18px] pt-4 pb-3 bg-surface border-b border-border shrink-0">
+          <button type="button" onClick={() => router.back()} aria-label="Go back"
+            className="w-9 h-9 rounded-full bg-surface-bg inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange">
+            <Icon name="ArrowLeft" size={18} />
+          </button>
+          <div className="skeleton h-5 w-36 rounded flex-1" />
+        </div>
+        <div className="w-full max-w-3xl mx-auto px-4 md:px-8 pt-4 flex flex-col gap-3">
+          <SkeletonCard className="h-32" />
+          <SkeletonCard className="h-24" />
+          <SkeletonCard className="h-14" />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Event fetch error ───────────────────────────────────────────────────────
+  if (evError || !ev) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex md:hidden items-center gap-3 px-[18px] pt-4 pb-3 bg-surface border-b border-border shrink-0">
+          <button type="button" onClick={() => router.back()} aria-label="Go back"
+            className="w-9 h-9 rounded-full bg-surface-bg inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange">
+            <Icon name="ArrowLeft" size={18} />
+          </button>
+          <h1 className="font-display font-semibold text-[18px] text-text flex-1 m-0">Booking summary</h1>
+        </div>
+        <div className="w-full max-w-3xl mx-auto px-4 md:px-8 pt-6">
+          <AlertBanner tone="danger" message="Event not found." />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -95,6 +158,17 @@ export default function BookingPage({ params }: PageProps) {
       <div className="flex-1 overflow-y-auto">
         {/* Content — centred on desktop */}
         <div className="w-full max-w-3xl mx-auto px-4 md:px-8 pt-4 pb-8">
+
+          {/* Booking mutation error — server message surfaced here */}
+          {createBooking.isError && (
+            <div className="mb-4">
+              <AlertBanner
+                tone="danger"
+                title="Booking failed"
+                message={createBooking.error?.message ?? "Could not create booking. Please try again."}
+              />
+            </div>
+          )}
 
           {/* Order summary card */}
           <div className="border border-border rounded-md overflow-hidden mb-5">
@@ -209,11 +283,12 @@ export default function BookingPage({ params }: PageProps) {
             <Button
               fullWidth
               size="lg"
-              disabled={lines.length === 0}
+              disabled={lines.length === 0 || createBooking.isPending}
+              loading={createBooking.isPending}
               onClick={handleConfirm}
               aria-label="Confirm booking"
             >
-              Confirm booking
+              {createBooking.isPending ? "Creating booking…" : "Confirm booking"}
             </Button>
           </div>
         </div>
@@ -224,11 +299,12 @@ export default function BookingPage({ params }: PageProps) {
         <Button
           fullWidth
           size="lg"
-          disabled={lines.length === 0}
+          disabled={lines.length === 0 || createBooking.isPending}
+          loading={createBooking.isPending}
           onClick={handleConfirm}
           aria-label="Confirm booking"
         >
-          Confirm booking
+          {createBooking.isPending ? "Creating booking…" : "Confirm booking"}
         </Button>
       </div>
     </div>

@@ -1,47 +1,70 @@
 'use client';
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/Shared/Icon";
 import { EventCard } from "@/components/Shared/EventCard";
 import { SkeletonCard } from "@/components/Shared/SkeletonCard";
 import { EmptyState } from "@/components/Shared/EmptyState";
+import { AlertBanner } from "@/components/Shared/AlertBanner";
 import { Button } from "@/components/Shared/Button";
-import { EVENTS } from "@/lib/mock-data";
+import { useEvents } from "@/lib/api/hooks/useEvents";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 import { ROUTES } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 
 const FILTERS = ["All", "Concert", "Football", "Conference", "Graduation"] as const;
 type Filter = (typeof FILTERS)[number];
 
+// Map UI filter label → API category param (empty string = no filter)
+const CATEGORY_PARAM: Record<Filter, string | undefined> = {
+  All:        undefined,
+  Concert:    "Concert",
+  Football:   "Football",
+  Conference: "Conference",
+  Graduation: "Graduation",
+};
+
 function HomeContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const isDiscover = searchParams.get("tab") === "discover";
+  const router        = useRouter();
+  const searchParams  = useSearchParams();
+  const isDiscover    = searchParams.get("tab") === "discover";
 
   const [filter, setFilter] = useState<Filter>("All");
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
+  const debouncedSearch     = useDebounce(search, 300);
 
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 400);
-    return () => clearTimeout(t);
-  }, []);
-
-  const featured = EVENTS.find((e) => e.featured);
-  const filtered = EVENTS.filter((e) => {
-    const catMatch = filter === "All" || e.category === filter;
-    const searchMatch =
-      !search.trim() ||
-      e.title.toLowerCase().includes(search.trim().toLowerCase());
-    return catMatch && searchMatch;
+  // ── All events (filtered) — used for the upcoming list ────────────────────
+  const {
+    data:      allEvents = [],
+    isLoading: eventsLoading,
+    isError:   eventsError,
+    error:     eventsErrorObj,
+  } = useEvents({
+    category: CATEGORY_PARAM[filter],
+    search:   debouncedSearch || undefined,
   });
-  const upcoming = filter === "All" ? filtered.filter((e) => !e.featured) : filtered;
-  const isEmpty = !loading && filtered.length === 0;
+
+  // ── Featured event — always "All" category, featured flag ─────────────────
+  // Only shown when filter === "All" and not in discover tab.
+  // We derive it from allEvents to avoid a second request (the API includes
+  // featured in the general list). If no featured event is in the current
+  // result set, fall back to the first event.
+  const featured   = filter === "All" ? (allEvents.find((e) => e.featured) ?? null) : null;
+  const upcoming   = filter === "All" && !isDiscover
+    ? allEvents.filter((e) => !e.featured)
+    : allEvents;
+
+  const isLoading  = eventsLoading;
+  const isError    = eventsError;
+  const errorMsg   = eventsErrorObj instanceof Error
+    ? eventsErrorObj.message
+    : "Failed to load events. Please try again.";
+  const isEmpty    = !isLoading && !isError && allEvents.length === 0;
 
   return (
     <div className="flex flex-col min-h-full">
-      {/* Top bar — mobile only (desktop shell topbar shows the title) */}
+      {/* Top bar — mobile only */}
       <div className="flex md:hidden items-center gap-3 px-[18px] pt-4 pb-3 bg-surface border-b border-border shrink-0">
         <h1 className="font-display font-semibold text-[22px] text-text flex-1 m-0">
           {isDiscover ? "Discover" : "Discover"}
@@ -100,7 +123,7 @@ function HomeContent() {
 
         {/* Main content */}
         <div className="pb-8">
-          {loading ? (
+          {isLoading ? (
             <>
               <SkeletonCard variant="event" className="mb-3" />
               <div className="h-5 w-36 skeleton rounded mb-3 mt-5" />
@@ -110,6 +133,13 @@ function HomeContent() {
                 <SkeletonCard variant="event" />
               </div>
             </>
+          ) : isError ? (
+            <AlertBanner
+              tone="danger"
+              title="Could not load events"
+              message={errorMsg}
+              className="mt-4"
+            />
           ) : isEmpty ? (
             <EmptyState
               icon="CalendarSearch"
@@ -140,7 +170,11 @@ function HomeContent() {
 
               {/* Section heading */}
               <h2 className="font-display font-semibold text-[17px] text-text mb-3 mt-1">
-                {isDiscover ? "Browse all events" : filter === "All" ? "Upcoming events" : filter}
+                {isDiscover
+                  ? "Browse all events"
+                  : filter === "All"
+                  ? "Upcoming events"
+                  : filter}
               </h2>
 
               {/* Event list — 2-col grid on desktop */}

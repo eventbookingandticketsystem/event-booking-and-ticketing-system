@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Home/Navbar";
 import { ExploreFilters } from "@/components/Home/ExploreFilters";
@@ -9,12 +9,12 @@ import { EmptyState } from "@/components/Shared/EmptyState";
 import { Button } from "@/components/Shared/Button";
 import { Icon } from "@/components/Shared/Icon";
 import {
-  EXPLORE_EVENTS,
   EXPLORE_CATEGORIES,
   EXPLORE_TIMES,
 } from "@/lib/mock-data";
 import { ROUTES } from "@/constants/routes";
 import { cn } from "@/lib/utils";
+import { useExploreEvents } from "@/lib/api/hooks/useExploreEvents";
 
 // Skeleton card for explore page (3:4 dark)
 function ExploreCardSkeleton({ fixed = false }: { fixed?: boolean }) {
@@ -34,26 +34,30 @@ function ExploreCardSkeleton({ fixed = false }: { fixed?: boolean }) {
 export default function ExplorePage() {
   const router = useRouter();
 
-  const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("All");
-  const [activeTime, setActiveTime] = useState("");
-  const [city, setCity] = useState("Juba");
-  const [search, setSearch] = useState("");
+  const [activeTime,     setActiveTime]     = useState("");
+  const [city,           setCity]           = useState("All Cities");
+  const [search,         setSearch]         = useState("");
 
-  // Simulate brief data-load delay
+  // Debounce search so we don't hammer the API on every keystroke
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 300);
-    return () => clearTimeout(t);
-  }, []);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedSearch(search), 280);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [search]);
 
-  // Filter logic: AND — all active filters must match
-  const filtered = EXPLORE_EVENTS.filter((ev) => {
-    const catMatch  = activeCategory === "All" || ev.category === activeCategory;
-    const timeMatch = !activeTime || ev.times.includes(activeTime);
-    const searchMatch = !search.trim() ||
-      ev.title.toLowerCase().includes(search.trim().toLowerCase());
-    return catMatch && timeMatch && searchMatch;
+  const { data: events = [], isLoading, isError } = useExploreEvents({
+    category:   activeCategory !== "All" ? activeCategory : undefined,
+    search:     debouncedSearch || undefined,
+    city:       city !== "All Cities" ? city : undefined,
   });
+
+  // Client-side time filter (can't express date-range on the API)
+  const filtered = activeTime
+    ? events.filter((ev) => ev.times.includes(activeTime))
+    : events;
 
   const happeningNow = filtered.filter((e) => e.status === "happening-now");
   const upcoming     = filtered.filter((e) => e.status !== "happening-now");
@@ -92,10 +96,30 @@ export default function ExplorePage() {
       />
 
       <main className="max-w-[1180px] mx-auto px-7 py-7">
+
+        {/* Error state */}
+        {isError && (
+          <div
+            className="max-w-130 mx-auto mt-10 rounded-xl p-8 text-center"
+            style={{ background: "rgba(14,28,41,0.9)", border: "1px solid rgba(255,255,255,0.08)" }}
+          >
+            <EmptyState
+              icon="WifiOff"
+              heading="Could not load events"
+              subtext="Check your connection and try again."
+              dark
+              cta={
+                <Button size="sm" onClick={() => window.location.reload()} className="mt-2">
+                  Retry
+                </Button>
+              }
+            />
+          </div>
+        )}
+
         {/* Loading skeleton */}
-        {loading && (
+        {isLoading && !isError && (
           <>
-            {/* Active events skeleton */}
             <div className="mb-9">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-display font-bold text-[22px] text-white flex items-center gap-2.5">
@@ -112,7 +136,6 @@ export default function ExplorePage() {
                 ))}
               </div>
             </div>
-            {/* Upcoming skeleton */}
             <div>
               <div className="mb-4">
                 <h2 className="font-display font-bold text-[22px] text-white">
@@ -128,10 +151,10 @@ export default function ExplorePage() {
           </>
         )}
 
-        {/* Loaded state */}
-        {!loading && filtered.length === 0 && (
+        {/* Empty state */}
+        {!isLoading && !isError && filtered.length === 0 && (
           <div
-            className="max-w-[520px] mx-auto mt-10 rounded-xl p-8 text-center"
+            className="max-w-130 mx-auto mt-10 rounded-xl p-8 text-center"
             style={{ background: "rgba(14,28,41,0.9)", border: "1px solid rgba(255,255,255,0.08)" }}
           >
             <EmptyState
@@ -148,7 +171,8 @@ export default function ExplorePage() {
           </div>
         )}
 
-        {!loading && filtered.length > 0 && (
+        {/* Loaded */}
+        {!isLoading && !isError && filtered.length > 0 && (
           <>
             {/* Active / Happening Now */}
             {happeningNow.length > 0 && (
@@ -212,6 +236,9 @@ export default function ExplorePage() {
                 </div>
               </section>
             )}
+
+            {/* All events are happening-now — no upcoming section needed */}
+            {upcoming.length === 0 && happeningNow.length === 0 && null}
           </>
         )}
       </main>

@@ -14,7 +14,7 @@ export default withAuth(
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
 
-    if (pathname.startsWith("/agent") && token?.role !== "AGENT") {
+    if (pathname.startsWith("/agent") && token?.role !== "GATE_AGENT") {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
 

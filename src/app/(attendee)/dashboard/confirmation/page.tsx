@@ -1,25 +1,39 @@
 'use client';
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/Shared/Button";
 import { AlertBanner } from "@/components/Shared/AlertBanner";
 import { Icon } from "@/components/Shared/Icon";
-import { formatSSP } from "@/lib/utils";
+import { formatSSP, formatDate } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
-
-function genRef(): string {
-  return "BKG-" + Math.random().toString(36).slice(2, 10).toUpperCase();
-}
 
 export default function ConfirmationPage() {
   const router = useRouter();
-  const [bookingRef] = useState(genRef);
 
-  const total =
-    typeof window !== "undefined"
-      ? Number(sessionStorage.getItem("tiketi-total") ?? 18500)
-      : 18500;
+  // Read all booking context persisted by the booking + payment pages
+  const bookingRef   = typeof window !== "undefined"
+    ? sessionStorage.getItem("tiketi-booking-ref")   ?? "—"
+    : "—";
+  const total        = typeof window !== "undefined"
+    ? Number(sessionStorage.getItem("tiketi-total")  ?? 0)
+    : 0;
+  const eventTitle   = typeof window !== "undefined"
+    ? sessionStorage.getItem("tiketi-event-title")   ?? "—"
+    : "—";
+  const eventDate    = typeof window !== "undefined"
+    ? sessionStorage.getItem("tiketi-event-date")    ?? ""
+    : "";
+  const ticketCount  = typeof window !== "undefined"
+    ? sessionStorage.getItem("tiketi-ticket-count")  ?? "1"
+    : "1";
+
+  const displayDate = eventDate ? formatDate(eventDate) : "—";
+
+  const summaryRows = [
+    { k: "Event",   v: eventTitle },
+    { k: "Date",    v: displayDate },
+    { k: "Tickets", v: ticketCount },
+  ];
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -42,11 +56,7 @@ export default function ConfirmationPage() {
 
         {/* Summary card */}
         <div className="border border-border rounded-md overflow-hidden mb-[18px]">
-          {[
-            { k: "Event",   v: "Juba Music Festival 2025" },
-            { k: "Date",    v: "Sat, 14 Dec 2025" },
-            { k: "Tickets", v: "2" },
-          ].map((row) => (
+          {summaryRows.map((row) => (
             <div key={row.k} className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border/50">
               <span className="text-sm font-medium text-text-secondary">{row.k}</span>
               <span className="font-display font-semibold text-sm text-text">{row.v}</span>
@@ -58,11 +68,11 @@ export default function ConfirmationPage() {
           </div>
         </div>
 
-        {/* SMS notification banner */}
+        {/* Ticket-link info banner */}
         <AlertBanner
           tone="info"
           title="Ticket link sent"
-          message="A confirmation with your ticket link was sent to +211 928 114 507."
+          message="A confirmation with your ticket link was sent to your registered phone number."
           className="mb-[18px]"
         />
 

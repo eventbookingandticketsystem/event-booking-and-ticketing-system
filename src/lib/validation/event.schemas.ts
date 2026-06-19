@@ -12,13 +12,15 @@ export const createEventSchema = z.object({
   title:       z.string().min(5),
   description: z.string().min(20).optional(),
   venue:       z.string().min(1),
-  city:        z.string().optional().default("Juba"),
+  city:        z.string().min(1, "City is required"),
   date:        z.string().datetime(),
   time:        z.string().min(1),
   category:    z.string().min(1),
   poster:      z.string().optional(),
+  image:       z.string().url().optional(),
   about:       z.string().optional(),
   featured:    z.boolean().optional().default(false),
+  status:      z.enum(["DRAFT", "PUBLISHED"]).optional().default("PUBLISHED"),
   tiers:       z.array(tierSchema).min(1, "At least one ticket tier is required"),
 });
 

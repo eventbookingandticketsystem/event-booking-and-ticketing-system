@@ -3,17 +3,21 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { TicketCard } from "@/components/Shared/TicketCard";
+import { SkeletonCard } from "@/components/Shared/SkeletonCard";
 import { EmptyState } from "@/components/Shared/EmptyState";
+import { AlertBanner } from "@/components/Shared/AlertBanner";
 import { Button } from "@/components/Shared/Button";
 import { cn } from "@/lib/utils";
-import { MY_TICKETS, EVENT_BY_ID } from "@/lib/mock-data";
+import { useTickets } from "@/lib/api/hooks/useTickets";
 import { ROUTES } from "@/constants/routes";
 
 export default function TicketsPage() {
   const router = useRouter();
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
 
-  const tickets = MY_TICKETS.filter((t) => t.when === tab);
+  const { data: allTickets, isLoading, isError, error } = useTickets();
+
+  const tickets = (allTickets ?? []).filter((t) => t.when === tab);
 
   return (
     <div className="flex flex-col">
@@ -49,7 +53,17 @@ export default function TicketsPage() {
 
         {/* Ticket list */}
         <div className="pt-4 pb-8 flex flex-col gap-3">
-          {tickets.length === 0 ? (
+          {isLoading ? (
+            // Loading skeleton — 3 cards matching ticket card dimensions
+            Array.from({ length: 3 }).map((_, i) => (
+              <SkeletonCard key={i} className="h-[148px]" />
+            ))
+          ) : isError ? (
+            <AlertBanner
+              tone="danger"
+              message={(error as Error)?.message ?? "Failed to load tickets. Please try again."}
+            />
+          ) : tickets.length === 0 ? (
             tab === "upcoming" ? (
               <EmptyState
                 icon="Ticket"
@@ -74,13 +88,15 @@ export default function TicketsPage() {
             )
           ) : (
             tickets.map((ticket) => {
-              const event = EVENT_BY_ID[ticket.eventId];
-              if (!event) return null;
+              // Use the embedded event summary from the API response
+              const eventSummary = ticket.event;
+              if (!eventSummary) return null;
+
               return (
                 <TicketCard
                   key={ticket.id}
                   ticket={ticket}
-                  event={event}
+                  event={eventSummary}
                   onClick={() => router.push(ROUTES.TICKET_QR(ticket.id))}
                 />
               );

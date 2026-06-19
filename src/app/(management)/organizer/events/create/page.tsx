@@ -1,17 +1,25 @@
 'use client';
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { CldUploadWidget } from "next-cloudinary";
 import { OrgTopbar } from "@/components/Organizer/OrgTopbar";
 import { Button } from "@/components/Shared/Button";
 import { Icon } from "@/components/Shared/Icon";
 import { AlertBanner } from "@/components/Shared/AlertBanner";
 import { cn } from "@/lib/utils";
-import { addCreatedEvent } from "@/lib/created-events";
+import { useCreateEvent } from "@/lib/api/hooks/useCreateEvent";
 import { ROUTES } from "@/constants/routes";
 
 const STEP_LABELS = ["Event details", "Ticket categories", "Review & publish"];
-const CATEGORIES = ["Concert", "Football", "Conference", "Graduation", "Other"] as const;
+const CATEGORIES = ["Concert", "Football", "Conference", "Graduation", "Church", "Food & Drinks", "Arts & Culture", "Other"] as const;
+
+const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET ?? "tiketi_events";
+
+interface CloudinaryResult {
+  public_id: string;
+  secure_url: string;
+}
 
 interface CatBlock {
   name: string;
@@ -25,10 +33,12 @@ interface Step1Fields {
   title: string;
   desc: string;
   venue: string;
+  city: string;
   date: string;
   time: string;
   category: string;
-  posterName: string;
+  /** Uploaded image URL from Cloudinary */
+  imageUrl: string;
 }
 
 function isFutureDate(d: string): boolean {
@@ -144,7 +154,7 @@ function TextArea({
 function SelectInput({
   value, onChange, options, placeholder, error,
 }: {
-  value: string; onChange: (v: string) => void; options: string[];
+  value: string; onChange: (v: string) => void; options: readonly string[];
   placeholder?: string; error?: string;
 }) {
   return (
@@ -193,15 +203,17 @@ function NumInput({
 
 export default function CreateEventPage() {
   const router = useRouter();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const createEvent = useCreateEvent();
 
-  const [step, setStep] = useState(1);
-  const [touched1, setTouched1] = useState(false);
-  const [touched2, setTouched2] = useState(false);
-  const [publishing, setPublishing] = useState(false);
+  const [step,        setStep]        = useState(1);
+  const [touched1,    setTouched1]    = useState(false);
+  const [touched2,    setTouched2]    = useState(false);
+  const [uploading,   setUploading]   = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
 
   const [f, setF] = useState<Step1Fields>({
-    title: "", desc: "", venue: "", date: "", time: "", category: "", posterName: "",
+    title: "", desc: "", venue: "", city: "",
+    date: "", time: "", category: "", imageUrl: "",
   });
   const set = (k: keyof Step1Fields) => (v: string) => setF((prev) => ({ ...prev, [k]: v }));
 
@@ -211,11 +223,12 @@ export default function CreateEventPage() {
 
   // Step 1 validation
   const e1 = {
-    title: !f.title.trim() ? "Event title is required" : f.title.trim().length < 5 ? "At least 5 characters" : "",
-    desc: !f.desc.trim() ? "Description is required" : f.desc.trim().length < 20 ? "At least 20 characters" : "",
-    venue: !f.venue.trim() ? "Venue is required" : "",
-    date: !f.date ? "Pick a date" : !isFutureDate(f.date) ? "Must be a future date" : "",
-    time: !f.time ? "Pick a time" : "",
+    title:    !f.title.trim() ? "Event title is required" : f.title.trim().length < 5 ? "At least 5 characters" : "",
+    desc:     !f.desc.trim() ? "Description is required" : f.desc.trim().length < 20 ? "At least 20 characters" : "",
+    venue:    !f.venue.trim() ? "Venue is required" : "",
+    city:     !f.city ? "City is required" : "",
+    date:     !f.date ? "Pick a date" : !isFutureDate(f.date) ? "Must be a future date" : "",
+    time:     !f.time ? "Pick a time" : "",
     category: !f.category ? "Choose a category" : "",
   };
   const step1Valid = !Object.values(e1).some(Boolean);
@@ -223,11 +236,11 @@ export default function CreateEventPage() {
 
   // Step 2 per-cat validation
   const catErr = (c: CatBlock) => ({
-    name: !c.name.trim() ? "Required" : "",
-    price: c.price === "" ? "Required" : Number(c.price) < 0 ? "Min $0" : "",
+    name:     !c.name.trim() ? "Required" : "",
+    price:    c.price === "" ? "Required" : Number(c.price) < 0 ? "Min $0" : "",
     capacity: c.capacity === "" ? "Required" : Number(c.capacity) < 1 ? "Min 1" : "",
-    open: !c.open ? "Required" : "",
-    close: !c.close ? "Required"
+    open:     !c.open ? "Required" : "",
+    close:    !c.close ? "Required"
       : (c.open && c.close < c.open) ? "Must be after sale opens"
       : (f.date && c.close > f.date) ? "Must be on or before event date"
       : "",
@@ -250,32 +263,68 @@ export default function CreateEventPage() {
 
   // Step 3 checks
   const checks = [
-    { label: "Event title",          ok: !e1.title },
-    { label: "Description",          ok: !e1.desc },
-    { label: "Venue",                ok: !e1.venue },
-    { label: "Date & time",          ok: !e1.date && !e1.time },
-    { label: "Category",             ok: !e1.category },
-    { label: "Ticket categories",    ok: step2Valid },
+    { label: "Event title",       ok: !e1.title },
+    { label: "Description",       ok: !e1.desc },
+    { label: "Venue & city",      ok: !e1.venue && !e1.city },
+    { label: "Date & time",       ok: !e1.date && !e1.time },
+    { label: "Category",          ok: !e1.category },
+    { label: "Ticket categories", ok: step2Valid },
   ];
   const allValid = checks.every((c) => c.ok);
 
-  const publish = () => {
-    if (!allValid || publishing) return;
-    setPublishing(true);
-    setTimeout(() => {
-      setPublishing(false);
-      addCreatedEvent({
-        id: `evt-new-${Date.now()}`,
-        name: f.title,
-        date: f.date || "TBD",
-        venue: f.venue,
-        sold: 0,
-        capacity: cats.reduce((s, c) => s + (Number(c.capacity) || 0), 0),
-        status: "Published" as const,
-        category: f.category,
-      });
+  function toIsoDatetime(date: string, time: string): string {
+    const [hours, minutes] = time ? time.split(":").map(Number) : [0, 0];
+    const d = new Date(date);
+    d.setHours(hours, minutes ?? 0, 0, 0);
+    return d.toISOString();
+  }
+
+  /** Build the payload from current form state */
+  function buildPayload(status: "PUBLISHED" | "DRAFT") {
+    return {
+      title:       f.title,
+      description: f.desc || undefined,
+      venue:       f.venue,
+      city:        f.city,
+      date:        toIsoDatetime(f.date, f.time),
+      time:        f.time,
+      category:    f.category,
+      status,
+      ...(f.imageUrl ? { image: f.imageUrl } : {}),
+      tiers: cats.map((c) => ({
+        name:       c.name,
+        price:      Number(c.price),
+        capacity:   Number(c.capacity),
+        saleOpens:  c.open  ? toIsoDatetime(c.open,  "00:00") : undefined,
+        saleCloses: c.close ? toIsoDatetime(c.close, "23:59") : undefined,
+      })),
+    };
+  }
+
+  const publish = async () => {
+    if (!allValid || createEvent.isPending || savingDraft) return;
+    try {
+      await createEvent.mutateAsync(buildPayload("PUBLISHED"));
       router.push(ROUTES.ORGANIZER_EVENTS);
-    }, 1200);
+    } catch {
+      // Error surfaced via createEvent.error banner below
+    }
+  };
+
+  const saveAsDraft = async () => {
+    if (createEvent.isPending || savingDraft) return;
+    // Draft only needs step 1 valid (title + venue + city + date + category)
+    setTouched1(true);
+    if (!step1Valid) return;
+    setSavingDraft(true);
+    try {
+      await createEvent.mutateAsync(buildPayload("DRAFT"));
+      router.push(ROUTES.ORGANIZER_EVENTS);
+    } catch {
+      // Error surfaced via createEvent.error banner below
+    } finally {
+      setSavingDraft(false);
+    }
   };
 
   return (
@@ -298,10 +347,21 @@ export default function CreateEventPage() {
 
         <h1 className="font-display font-bold text-[26px] text-text mb-6">Create event</h1>
 
-        {/* Step indicator */}
         <StepIndicator step={step} />
 
+        {/* Global error (covers draft save failures from step 1 / step 2) */}
+        {createEvent.isError && step !== 3 && (
+          <div className="max-w-[760px] mb-4">
+            <AlertBanner
+              tone="danger"
+              title="Could not save event"
+              message={createEvent.error?.message ?? "An error occurred. Please try again."}
+            />
+          </div>
+        )}
+
         <div className="max-w-[760px]">
+
           {/* ── STEP 1 ── */}
           {step === 1 && (
             <div className="bg-surface border border-border rounded-lg overflow-hidden">
@@ -309,17 +369,24 @@ export default function CreateEventPage() {
                 <h2 className="font-display font-semibold text-[17px] text-text m-0">Event details</h2>
               </div>
               <div className="p-6 flex flex-col gap-5">
+
                 <FieldWrap label="Event title" error={err1("title")}>
-                  <TextInput value={f.title} onChange={set("title")} placeholder="e.g. Juba Music Festival 2025" error={err1("title")} />
+                  <TextInput value={f.title} onChange={set("title")} placeholder="e.g. Summer Concert 2025" error={err1("title")} />
                 </FieldWrap>
 
                 <FieldWrap label="Description" error={err1("desc")} hint="At least 20 characters">
                   <TextArea value={f.desc} onChange={set("desc")} placeholder="Tell attendees what to expect…" error={err1("desc")} />
                 </FieldWrap>
 
-                <FieldWrap label="Venue" error={err1("venue")}>
-                  <TextInput value={f.venue} onChange={set("venue")} placeholder="e.g. Nyakuron Cultural Centre" error={err1("venue")} />
-                </FieldWrap>
+                {/* Venue + City side-by-side */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <FieldWrap label="Venue" error={err1("venue")}>
+                    <TextInput value={f.venue} onChange={set("venue")} placeholder="e.g. City Arena" error={err1("venue")} />
+                  </FieldWrap>
+                  <FieldWrap label="City" error={err1("city")}>
+                    <TextInput value={f.city} onChange={set("city")} placeholder="e.g. New York" error={err1("city")} />
+                  </FieldWrap>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <FieldWrap label="Date" error={err1("date")}>
@@ -334,46 +401,89 @@ export default function CreateEventPage() {
                   <SelectInput
                     value={f.category}
                     onChange={set("category")}
-                    options={[...CATEGORIES]}
+                    options={CATEGORIES}
                     placeholder="Select a category"
                     error={err1("category")}
                   />
                 </FieldWrap>
 
-                {/* Poster upload */}
-                <FieldWrap label="Event poster (optional)">
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/png,image/jpeg"
-                    className="sr-only"
-                    aria-label="Upload event poster"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) set("posterName")(file.name);
+                {/* ── Cloudinary poster upload ── */}
+                <FieldWrap label="Event poster (optional)" hint="Recommended 1200×628px · PNG or JPG · max 5 MB">
+                  <CldUploadWidget
+                    uploadPreset={UPLOAD_PRESET}
+                    options={{
+                      sources: ["local", "url"],
+                      multiple: false,
+                      maxFiles: 1,
+                      clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
+                      maxFileSize: 5_242_880,
                     }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fileRef.current?.click()}
-                    className={cn(
-                      "w-full flex flex-col items-center justify-center gap-2 px-6 py-8 border-2 border-dashed rounded-lg transition-colors",
-                      f.posterName
-                        ? "border-status-success bg-status-success-bg"
-                        : "border-border bg-surface-bg hover:border-brand-orange/40",
-                    )}
+                    onQueuesStart={() => setUploading(true)}
+                    onSuccess={(result) => {
+                      setUploading(false);
+                      if (result.event !== "success") return;
+                      const info = result.info as CloudinaryResult;
+                      set("imageUrl")(info.secure_url);
+                    }}
+                    onError={() => setUploading(false)}
                   >
-                    <Icon name={f.posterName ? "Check" : "CloudUpload"} size={26} className={f.posterName ? "text-status-success" : "text-text-muted"} />
-                    <p className="text-sm font-semibold text-text">
-                      {f.posterName || "Upload event poster"}
-                    </p>
-                    <p className="text-xs text-text-muted">
-                      {f.posterName ? "Click to change" : "Recommended 1200x628px · PNG or JPG · max 5 MB"}
-                    </p>
-                  </button>
+                    {({ open }) => (
+                      <button
+                        type="button"
+                        onClick={() => open()}
+                        disabled={uploading}
+                        aria-label="Upload event poster"
+                        className={cn(
+                          "w-full flex flex-col items-center justify-center gap-2 px-6 py-8 border-2 border-dashed rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange",
+                          f.imageUrl
+                            ? "border-status-success bg-status-success-bg"
+                            : "border-border bg-surface-bg hover:border-brand-orange/40",
+                          uploading && "opacity-60 cursor-wait",
+                        )}
+                      >
+                        {/* Preview thumbnail */}
+                        {f.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={f.imageUrl}
+                            alt="Event poster preview"
+                            className="w-full max-h-40 object-cover rounded-md mb-1"
+                          />
+                        ) : (
+                          <Icon
+                            name={uploading ? "Loader" : "CloudUpload"}
+                            size={26}
+                            className={cn(
+                              "text-text-muted",
+                              uploading && "animate-spin",
+                            )}
+                          />
+                        )}
+                        <p className="text-sm font-semibold text-text">
+                          {uploading ? "Uploading…" : f.imageUrl ? "Poster uploaded · click to change" : "Upload event poster"}
+                        </p>
+                        {!f.imageUrl && !uploading && (
+                          <p className="text-xs text-text-muted">PNG, JPG or WebP · max 5 MB</p>
+                        )}
+                      </button>
+                    )}
+                  </CldUploadWidget>
                 </FieldWrap>
 
-                <div className="flex justify-end pt-2">
+                <div className="flex items-center justify-between pt-2">
+                  <Button
+                    variant="ghost"
+                    onClick={saveAsDraft}
+                    disabled={savingDraft}
+                    className="gap-2 text-text-secondary"
+                    aria-label="Save as draft"
+                  >
+                    {savingDraft ? (
+                      <><Icon name="Loader" size={14} className="animate-spin" /> Saving…</>
+                    ) : (
+                      <><Icon name="Save" size={14} /> Save as draft</>
+                    )}
+                  </Button>
                   <Button onClick={next} className="gap-2">
                     Next
                     <Icon name="ArrowRight" size={16} />
@@ -412,7 +522,7 @@ export default function CreateEventPage() {
                           <TextInput value={c.name} onChange={(v) => setCat(i, "name", v)} placeholder="e.g. VIP" error={ce(c, "name")} />
                         </FieldWrap>
                       </div>
-                      <FieldWrap label="Price (USD)" error={ce(c, "price")}>
+                      <FieldWrap label="Price (SSP)" error={ce(c, "price")}>
                         <NumInput value={c.price} onChange={(v) => setCat(i, "price", v)} placeholder="0" min={0} error={ce(c, "price")} />
                       </FieldWrap>
                       <FieldWrap label="Capacity" error={ce(c, "capacity")}>
@@ -444,10 +554,25 @@ export default function CreateEventPage() {
                     <Icon name="ArrowLeft" size={16} />
                     Back
                   </Button>
-                  <Button onClick={next} className="gap-2">
-                    Next
-                    <Icon name="ArrowRight" size={16} />
-                  </Button>
+                  <div className="flex gap-3">
+                    <Button
+                      variant="ghost"
+                      onClick={saveAsDraft}
+                      disabled={savingDraft}
+                      className="gap-2 text-text-secondary"
+                      aria-label="Save as draft"
+                    >
+                      {savingDraft ? (
+                        <><Icon name="Loader" size={14} className="animate-spin" /> Saving…</>
+                      ) : (
+                        <><Icon name="Save" size={14} /> Save as draft</>
+                      )}
+                    </Button>
+                    <Button onClick={next} className="gap-2">
+                      Next
+                      <Icon name="ArrowRight" size={16} />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -461,17 +586,30 @@ export default function CreateEventPage() {
                 <div className="px-6 py-4 border-b border-border">
                   <h2 className="font-display font-semibold text-[17px] text-text m-0">Review</h2>
                 </div>
-                <div className="p-6">
+                <div className="p-6 flex flex-col gap-5">
+                  {/* Poster preview */}
+                  {f.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={f.imageUrl}
+                      alt="Event poster"
+                      className="w-full max-h-52 object-cover rounded-lg"
+                    />
+                  )}
                   <div className="grid grid-cols-2 gap-x-8 gap-y-4">
                     {[
-                      { label: "Title",     value: f.title || "—" },
-                      { label: "Category",  value: f.category || "—" },
-                      { label: "Venue",     value: f.venue || "—" },
+                      { label: "Title",       value: f.title || "—" },
+                      { label: "Category",    value: f.category || "—" },
+                      { label: "Venue",       value: f.venue || "—" },
+                      { label: "City",        value: f.city || "—" },
                       { label: "Date & time", value: f.date ? `${f.date} ${f.time}` : "—" },
+                      { label: "Poster",      value: f.imageUrl ? "Uploaded ✓" : "No poster" },
                     ].map((row) => (
                       <div key={row.label}>
                         <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-1">{row.label}</div>
-                        <div className="font-semibold text-text">{row.value}</div>
+                        <div className={cn("font-semibold text-text", row.label === "Poster" && f.imageUrl && "text-status-success")}>
+                          {row.value}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -488,7 +626,7 @@ export default function CreateEventPage() {
                     <thead>
                       <tr className="border-b border-border bg-surface-bg">
                         <th className="text-left px-5 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wide">Category</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wide">Price</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wide">Price (SSP)</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wide">Capacity</th>
                       </tr>
                     </thead>
@@ -497,7 +635,7 @@ export default function CreateEventPage() {
                         <tr key={i} className="border-b border-border/50 last:border-b-0">
                           <td className="px-5 py-3 font-semibold">{c.name || `Category ${i + 1}`}</td>
                           <td className="px-4 py-3 font-mono text-[13px]">
-                            {c.price ? `$${Number(c.price).toLocaleString("en-US")}` : "—"}
+                            {c.price ? `SSP ${Number(c.price).toLocaleString("en-US")}` : "—"}
                           </td>
                           <td className="px-4 py-3 font-mono text-[13px]">{c.capacity || "—"}</td>
                         </tr>
@@ -535,32 +673,60 @@ export default function CreateEventPage() {
                 message="You can still edit details after publishing."
               />
 
+              {createEvent.isError && (
+                <AlertBanner
+                  tone="danger"
+                  title="Could not publish event"
+                  message={createEvent.error?.message ?? "An error occurred. Please try again."}
+                />
+              )}
+
               <div className="flex items-center justify-between pt-1">
-                <Button variant="ghost" onClick={() => setStep(2)} disabled={publishing} className="gap-2">
+                <Button variant="ghost" onClick={() => setStep(2)} disabled={createEvent.isPending || savingDraft} className="gap-2">
                   <Icon name="ArrowLeft" size={16} />
                   Back
                 </Button>
                 <div className="flex gap-3">
                   <Button
                     variant="ghost"
-                    onClick={() => router.push(ROUTES.ORGANIZER_EVENTS)}
-                    disabled={publishing}
+                    onClick={saveAsDraft}
+                    disabled={createEvent.isPending || savingDraft}
+                    className="gap-2"
                   >
-                    Save as draft
+                    {savingDraft ? (
+                      <>
+                        <Icon name="Loader" size={15} className="animate-spin" />
+                        Saving draft…
+                      </>
+                    ) : (
+                      <>
+                        <Icon name="Save" size={15} />
+                        Save as draft
+                      </>
+                    )}
                   </Button>
                   <Button
                     onClick={publish}
-                    disabled={!allValid || publishing}
-                    loading={publishing}
+                    disabled={!allValid || createEvent.isPending || savingDraft}
                     className="gap-2"
                   >
-                    {!publishing && <Icon name="Send" size={16} />}
-                    {publishing ? "Publishing…" : "Publish event"}
+                    {createEvent.isPending ? (
+                      <>
+                        <Icon name="Loader" size={15} className="animate-spin" />
+                        Publishing…
+                      </>
+                    ) : (
+                      <>
+                        <Icon name="Send" size={16} />
+                        Publish event
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
             </div>
           )}
+
         </div>
       </div>
     </div>

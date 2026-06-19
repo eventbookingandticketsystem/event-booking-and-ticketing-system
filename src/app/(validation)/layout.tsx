@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { Icon } from "@/components/Shared/Icon";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
@@ -68,7 +69,7 @@ function AgentTopBar({ label }: { label: string }) {
       {/* Sign out */}
       <button
         type="button"
-        onClick={() => router.push(ROUTES.LOGIN)}
+        onClick={() => signOut({ redirect: true, callbackUrl: "/login" })}
         aria-label="Sign out"
         className="flex items-center gap-1.5 text-red-400 hover:text-red-300 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 rounded px-1 py-1"
       >

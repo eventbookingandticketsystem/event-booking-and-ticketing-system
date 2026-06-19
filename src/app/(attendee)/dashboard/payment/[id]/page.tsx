@@ -2,14 +2,13 @@
 
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
-import { notFound } from "next/navigation";
 import { Button } from "@/components/Shared/Button";
 import { AlertBanner } from "@/components/Shared/AlertBanner";
 import { StatusPill } from "@/components/Shared/StatusPill";
 import { Icon } from "@/components/Shared/Icon";
 import { formatSSP } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import { EVENT_BY_ID } from "@/lib/mock-data";
+import { useConfirmPayment } from "@/lib/api/hooks/useConfirmPayment";
 import { ROUTES } from "@/constants/routes";
 
 const TOTAL_SECS = 300; // 5:00
@@ -19,22 +18,31 @@ interface PageProps {
 }
 
 export default function PaymentPage({ params }: PageProps) {
-  const { id } = use(params);
+  const { id } = use(params);   // event id — used for fallback only
   const router = useRouter();
-
-  const ev = EVENT_BY_ID[id];
-  if (!ev) notFound();
+  const confirmPayment = useConfirmPayment();
 
   const [secs, setSecs] = useState(TOTAL_SECS);
   const [phase, setPhase] = useState<"waiting" | "timeout">("waiting");
   const [copied, setCopied] = useState(false);
 
+  // Read booking context written by BookingPage on mutation success
   const method = typeof window !== "undefined"
     ? (sessionStorage.getItem("tiketi-method") as "mtn" | "airtel") ?? "mtn"
     : "mtn";
   const total = typeof window !== "undefined"
-    ? Number(sessionStorage.getItem("tiketi-total") ?? 18500)
-    : 18500;
+    ? Number(sessionStorage.getItem("tiketi-total") ?? 0)
+    : 0;
+  const bookingId = typeof window !== "undefined"
+    ? sessionStorage.getItem("tiketi-booking-id") ?? ""
+    : "";
+  // Event title for the compact summary header
+  const eventTitle = typeof window !== "undefined"
+    ? sessionStorage.getItem("tiketi-event-title") ?? ""
+    : "";
+  const eventDate = typeof window !== "undefined"
+    ? sessionStorage.getItem("tiketi-event-date") ?? ""
+    : "";
 
   const provider = method === "mtn" ? "MTN Mobile Money" : "Airtel Money";
   const ussdCode = method === "mtn" ? `*165*4*1*${total}#` : `*185*4*1*${total}#`;
@@ -58,8 +66,21 @@ export default function PaymentPage({ params }: PageProps) {
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const handleSimulate = () => router.push(ROUTES.CONFIRMATION);
-  const handleRetry    = () => { setSecs(TOTAL_SECS); setPhase("waiting"); };
+  const handleConfirmPayment = async () => {
+    if (!bookingId) {
+      // No booking ID — shouldn't happen; navigate anyway (demo fallback)
+      router.push(ROUTES.CONFIRMATION);
+      return;
+    }
+    try {
+      await confirmPayment.mutateAsync(bookingId);
+      router.push(ROUTES.CONFIRMATION);
+    } catch {
+      // Error surfaced via confirmPayment.error banner below
+    }
+  };
+
+  const handleRetry = () => { setSecs(TOTAL_SECS); setPhase("waiting"); };
 
   return (
     <div className="flex flex-col h-full">
@@ -93,12 +114,21 @@ export default function PaymentPage({ params }: PageProps) {
         {/* Content — centred on desktop */}
         <div className="w-full max-w-3xl mx-auto px-4 md:px-8 pt-4 pb-8 flex flex-col gap-4">
 
+          {/* Payment mutation error */}
+          {confirmPayment.isError && (
+            <AlertBanner
+              tone="danger"
+              title="Payment confirmation failed"
+              message={confirmPayment.error?.message ?? "Could not confirm payment. Please try again."}
+            />
+          )}
+
           {/* Compact order summary */}
           <div className="border border-border rounded-md overflow-hidden">
             <div className="flex items-center justify-between gap-3 px-4 py-3 bg-surface-bg">
               <div>
-                <div className="text-sm font-semibold text-text">{ev.title}</div>
-                <div className="text-xs text-text-secondary mt-0.5">{ev.date}</div>
+                <div className="text-sm font-semibold text-text">{eventTitle || "Your booking"}</div>
+                <div className="text-xs text-text-secondary mt-0.5">{eventDate}</div>
               </div>
               <div className="font-display font-bold text-[17px] shrink-0">{formatSSP(total)}</div>
             </div>
@@ -197,21 +227,30 @@ export default function PaymentPage({ params }: PageProps) {
                 Waiting for payment confirmation…
               </div>
 
-              {/* Simulate success (demo) */}
+              {/* Confirm payment — calls PATCH /api/bookings/[id] */}
               <Button
                 fullWidth
                 size="lg"
-                onClick={handleSimulate}
+                loading={confirmPayment.isPending}
+                disabled={confirmPayment.isPending}
+                onClick={handleConfirmPayment}
                 className="gap-2"
               >
-                <Icon name="Check" size={18} />
-                I&apos;ve completed payment
+                {confirmPayment.isPending ? (
+                  "Confirming…"
+                ) : (
+                  <>
+                    <Icon name="Check" size={18} />
+                    I&apos;ve completed payment
+                  </>
+                )}
               </Button>
 
               <Button
                 fullWidth
                 variant="ghost"
-                onClick={handleSimulate}
+                disabled={confirmPayment.isPending}
+                onClick={handleConfirmPayment}
                 className="text-text-secondary"
               >
                 Simulate payment (demo)

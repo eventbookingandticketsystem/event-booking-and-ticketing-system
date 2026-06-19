@@ -1,12 +1,27 @@
+'use client';
+
 import { Icon } from "@/components/Shared/Icon";
+
+export interface UserMini {
+  name: string | null;
+  image: string | null;
+}
 
 interface OrgTopbarProps {
   crumb: string;
   eventName?: string;
   onEvent?: () => void;
+  user?: UserMini | null;
 }
 
-export function OrgTopbar({ crumb, eventName, onEvent }: OrgTopbarProps) {
+export function initials(name: string | null | undefined): string {
+  if (!name) return "U";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+export function OrgTopbar({ crumb, eventName, onEvent, user }: OrgTopbarProps) {
   return (
     <header className="h-14 bg-surface border-b border-border flex items-center justify-between px-6 sticky top-0 z-20 shrink-0">
       {/* Breadcrumb */}
@@ -36,13 +51,22 @@ export function OrgTopbar({ crumb, eventName, onEvent }: OrgTopbarProps) {
           Organizer
         </span>
 
-        {/* Avatar */}
-        <div
-          className="w-8 h-8 rounded-full bg-brand-navy text-white inline-flex items-center justify-center text-[13px] font-bold font-body shrink-0"
-          aria-label="User avatar: Rebecca Mayen"
-        >
-          RM
-        </div>
+        {/* Avatar — real image or initials */}
+        {user?.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={user.image}
+            alt={user.name ?? "User avatar"}
+            className="w-8 h-8 rounded-full object-cover shrink-0 border border-border"
+          />
+        ) : (
+          <div
+            className="w-8 h-8 rounded-full bg-brand-navy text-white inline-flex items-center justify-center text-[13px] font-bold font-body shrink-0"
+            aria-label={user?.name ? `User avatar: ${user.name}` : "User avatar"}
+          >
+            {initials(user?.name)}
+          </div>
+        )}
       </div>
     </header>
   );

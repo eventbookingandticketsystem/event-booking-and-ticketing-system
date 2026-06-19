@@ -64,6 +64,8 @@ export interface OrgEventRow {
   capacity: number;
   status: "Ongoing" | "Upcoming" | "Completed" | "Draft" | "Published";
   category: string;
+  image: string | null;   // Cloudinary URL or null (uses poster gradient as fallback)
+  poster: string;         // CSS gradient string (always present)
 }
 
 // Admin all-events table row (ALL_EVENTS)

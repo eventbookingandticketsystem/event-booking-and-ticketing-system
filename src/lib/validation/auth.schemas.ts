@@ -1,8 +1,10 @@
 import { z } from "zod";
 
-// Zod v4: use z.union for optional-or-empty-string pattern
-const optionalEmail = z.union([z.string().email(), z.literal(""), z.undefined()]);
-const optionalPhone = z.union([z.string().min(7), z.literal(""), z.undefined()]);
+// Zod v4: z.string().optional().or(z.literal("")) handles absent + empty-string + valid value.
+// z.union([..., z.undefined()]) does NOT work in Zod v4 — undefined in a union
+// requires an explicit undefined value, not an absent key.
+const optionalEmail = z.string().email().optional().or(z.literal(""));
+const optionalPhone = z.string().min(7).optional().or(z.literal(""));
 
 export const registerSchema = z
   .object({

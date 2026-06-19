@@ -1,6 +1,8 @@
 'use client';
 
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { Icon } from "@/components/Shared/Icon";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
@@ -14,11 +16,17 @@ const MENU_ITEMS: { icon: keyof typeof icons; label: string; danger?: boolean }[
 ];
 
 export default function AccountPage() {
-  const router = useRouter();
+  const router  = useRouter();
+  const { data: session } = useSession();
+  const user    = session?.user as Record<string, unknown> | undefined;
+  const name    = (user?.name as string | undefined)  ?? "—";
+  const phone   = (user?.phone as string | undefined) ?? "";
+  // Initials from name: "Achol Deng" → "AD"
+  const initials = name.split(" ").map((w) => w[0] ?? "").join("").slice(0, 2).toUpperCase() || "?";
 
   const handleItem = (label: string) => {
     if (label === "Sign out") {
-      router.push(ROUTES.LOGIN);
+      signOut({ redirect: true, callbackUrl: "/login" });
     }
   };
 
@@ -31,17 +39,17 @@ export default function AccountPage() {
 
       {/* Content wrapper — centred on desktop */}
       <div className="w-full max-w-2xl mx-auto px-4 md:px-8 pt-2 pb-8">
-        {/* Profile row */}
+        {/* Profile row — sourced from real session */}
         <div className="flex gap-3.5 items-center py-4 pb-6">
           <div
             className="w-16 h-16 rounded-full bg-brand-navy text-white inline-flex items-center justify-center font-display font-bold text-[22px] shrink-0"
             aria-label="User avatar"
           >
-            AD
+            {initials}
           </div>
           <div>
-            <div className="font-display font-bold text-[19px] text-text">Achol Deng</div>
-            <div className="text-sm text-text-muted font-mono">+211 928 114 507</div>
+            <div className="font-display font-bold text-[19px] text-text">{name}</div>
+            {phone && <div className="text-sm text-text-muted font-mono">{phone}</div>}
           </div>
         </div>
 

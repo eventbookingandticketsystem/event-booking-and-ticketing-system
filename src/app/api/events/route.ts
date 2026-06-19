@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
       }),
     };
 
-    const [events, total] = await prisma.$transaction([
+    const [events, total] = await Promise.all([
       prisma.event.findMany({
         where,
         skip,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { Icon } from "@/components/Shared/Icon";
 import { BottomNav, type AttendeeTab } from "@/components/Attendee/BottomNav";
 import { ROUTES } from "@/constants/routes";
@@ -115,7 +116,7 @@ function AttendeeSidebar({
         {/* Sign out */}
         <button
           type="button"
-          onClick={() => router.push(ROUTES.LOGIN)}
+          onClick={() => signOut({ redirect: true, callbackUrl: "/login" })}
           aria-label="Sign out"
           className="flex items-center gap-3 w-full px-4 py-2.5 rounded-md text-[14px] font-semibold font-body transition-colors text-left text-red-400 hover:text-red-300 hover:bg-white/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
         >

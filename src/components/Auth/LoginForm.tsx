@@ -1,35 +1,42 @@
 'use client';
 
 import { useState } from "react";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { PhoneInput } from "@/components/Shared/PhoneInput";
 import { Button } from "@/components/Shared/Button";
 import { AlertBanner } from "@/components/Shared/AlertBanner";
 import { Icon } from "@/components/Shared/Icon";
 import { DEFAULT_PHONE, type PhoneValue } from "@/constants/countries";
 import { cn } from "@/lib/utils";
+import { ROUTES } from "@/constants/routes";
 
 interface LoginFormProps {
-  onSuccess: () => void;
   onRegister: () => void;
-  onForgot: () => void;
-  /** Optional pre-set banner shown above the form (from URL param) */
+  onForgot:   () => void;
+  /** Optional pre-set banner from URL param (booking redirect, registered, etc.) */
   banner?: { tone: "success" | "danger" | "warning" | "info"; message: string } | null;
-  /** Show server-side credential error banner */
-  showError?: boolean;
 }
 
-export function LoginForm({
-  onSuccess,
-  onRegister,
-  onForgot,
-  banner,
-  showError = false,
-}: LoginFormProps) {
-  const [phone, setPhone] = useState<PhoneValue>(DEFAULT_PHONE);
-  const [pw, setPw] = useState("");
+// Map DB role string → destination route
+function roleRoute(role: unknown): string {
+  switch (role) {
+    case "ORGANIZER":  return ROUTES.ORGANIZER;
+    case "GATE_AGENT": return ROUTES.AGENT;
+    case "ADMIN":      return ROUTES.ADMIN;
+    default:           return ROUTES.DASHBOARD;  // ATTENDEE + fallback
+  }
+}
+
+export function LoginForm({ onRegister, onForgot, banner }: LoginFormProps) {
+  const router = useRouter();
+
+  const [phone, setPhone]   = useState<PhoneValue>(DEFAULT_PHONE);
+  const [pw, setPw]         = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [touched, setTouched] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Inline validation
   const errors = {
@@ -47,15 +54,37 @@ export function LoginForm({
   const isValid = !errors.phone && !errors.pw;
   const fieldError = (k: keyof typeof errors) => (touched ? errors[k] : "");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setTouched(true);
     if (!isValid) return;
+
     setLoading(true);
-    setTimeout(() => {
+    setAuthError(null);
+
+    // Combine dial code + local number: "+211" + "912000001" → "+211912000001"
+    const fullPhone = phone.dial + phone.num;
+
+    const result = await signIn("credentials", {
+      phone:    fullPhone,
+      password: pw,
+      redirect: false,   // handle redirect ourselves so we can read the role
+    });
+
+    if (!result?.ok || result.error) {
+      // Never expose which field was wrong — generic message per spec
+      setAuthError("Invalid credentials. Check your details and try again.");
       setLoading(false);
-      onSuccess();
-    }, 1100);
+      return;
+    }
+
+    // Fetch the session to read the role for role-based redirect.
+    // getSession() from next-auth/react returns the session after signIn.
+    const { getSession } = await import("next-auth/react");
+    const session = await getSession();
+    const role = (session?.user as Record<string, unknown> | undefined)?.role;
+
+    router.push(roleRoute(role));
   };
 
   return (
@@ -72,15 +101,15 @@ export function LoginForm({
         </p>
       </div>
 
-      {/* Banner from URL param */}
+      {/* Banner from URL param (booking redirect, registration success, etc.) */}
       {banner && <AlertBanner tone={banner.tone} message={banner.message} />}
 
-      {/* Credential error */}
-      {showError && (
+      {/* Auth error — shown only after a failed signIn attempt */}
+      {authError && (
         <AlertBanner
           tone="danger"
-          title="Incorrect phone number or password"
-          message="Check your details and try again."
+          title="Sign-in failed"
+          message={authError}
         />
       )}
 

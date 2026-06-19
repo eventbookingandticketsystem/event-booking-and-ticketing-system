@@ -571,33 +571,6 @@ export default function ScannerPage() {
           )}
         </button>
 
-        {/* Quick-fire demo buttons */}
-        <div className="flex flex-wrap gap-2 justify-center px-4" role="group" aria-label="Simulate specific result">
-          {(["admit", "used", "invalid", "wrong", "expired"] as ResultKind[]).map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => fireDemoResult(k)}
-              aria-label={`Simulate ${k}`}
-              className="px-3 py-1.5 rounded-pill bg-white/10 text-white/60 text-[12px] font-semibold hover:bg-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-            >
-              {k}
-            </button>
-          ))}
-        </div>
-
-        {/* Real API scan test button — only visible when agentId is present */}
-        {agentId && eventId && (
-          <button
-            type="button"
-            disabled={scanMutation.isPending}
-            onClick={() => fireRealScan("TIX-E12A-6819:6a33fa8d83957708f9f6d707:6a342d99ffe24e93e4d2a89f")}
-            aria-label="Fire real API scan with test payload"
-            className="px-4 py-2 rounded-lg border border-brand-orange/40 text-brand-orange text-[12px] font-semibold hover:bg-brand-orange/10 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
-          >
-            Real scan (test payload)
-          </button>
-        )}
       </div>
 
       {/* ── Menu dropdown ── */}

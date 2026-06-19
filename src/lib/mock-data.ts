@@ -296,6 +296,8 @@ export const ORG_EVENTS: OrgEventRow[] = [
     capacity: 2000,
     status: "Ongoing",
     category: "Concert",
+    image: null,
+    poster: "linear-gradient(157deg, #3a1d6e 0%, #241a52 45%, #0b1f3a 100%)",
   },
   {
     id: "evt-psl",
@@ -306,6 +308,8 @@ export const ORG_EVENTS: OrgEventRow[] = [
     capacity: 8600,
     status: "Upcoming",
     category: "Football",
+    image: null,
+    poster: "linear-gradient(157deg, #0f5132 0%, #0c3a2a 48%, #08283B 100%)",
   },
   {
     id: "evt-tech",
@@ -316,6 +320,8 @@ export const ORG_EVENTS: OrgEventRow[] = [
     capacity: 400,
     status: "Upcoming",
     category: "Conference",
+    image: null,
+    poster: "linear-gradient(157deg, #283545 0%, #313d4d 48%, #16181c 100%)",
   },
   {
     id: "evt-grad",
@@ -326,6 +332,8 @@ export const ORG_EVENTS: OrgEventRow[] = [
     capacity: 1200,
     status: "Completed",
     category: "Graduation",
+    image: null,
+    poster: "linear-gradient(157deg, #7a5e16 0%, #4f421d 45%, #0b2236 110%)",
   },
   {
     id: "evt-gospel",
@@ -336,6 +344,8 @@ export const ORG_EVENTS: OrgEventRow[] = [
     capacity: 3250,
     status: "Draft",
     category: "Concert",
+    image: null,
+    poster: "linear-gradient(157deg, #5b1626 0%, #3a1320 48%, #0b1f3a 100%)",
   },
 ];
 
@@ -350,6 +360,7 @@ export const GATE_AGENTS: GateAgentType[] = [
     event: "Juba Music Festival 2025",
     gate: "Gate A",
     status: "Active",
+    image: null,
   },
   {
     id: 2,
@@ -358,6 +369,7 @@ export const GATE_AGENTS: GateAgentType[] = [
     event: "Juba Music Festival 2025",
     gate: "Gate B",
     status: "Active",
+    image: null,
   },
   {
     id: 3,
@@ -366,6 +378,7 @@ export const GATE_AGENTS: GateAgentType[] = [
     event: "Juba Music Festival 2025",
     gate: "Gate C",
     status: "Inactive",
+    image: null,
   },
   {
     id: 4,
@@ -374,6 +387,7 @@ export const GATE_AGENTS: GateAgentType[] = [
     event: "SSPL Final",
     gate: "Turnstile 2",
     status: "Active",
+    image: null,
   },
 ];
 

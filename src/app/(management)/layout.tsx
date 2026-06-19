@@ -1,12 +1,15 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { OrgSidebar } from "@/components/Organizer/OrgSidebar";
 import { Icon } from "@/components/Shared/Icon";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
 import { type icons } from "lucide-react";
 import AuthProvider from "../auth/AuthProvider";
+import { useCurrentUser } from "@/lib/api/hooks/useCurrentUser";
+import { initials } from "@/components/Organizer/OrgTopbar";
 
 // ── Nav config ────────────────────────────────────────────────────────────
 
@@ -80,8 +83,12 @@ function getActiveNav(pathname: string): string {
 
 // ── Mobile top bar ────────────────────────────────────────────────────────
 
-function MobileTopBar({ label }: { label: string }) {
-  const router = useRouter();
+interface MobileTopBarProps {
+  label: string;
+  user?: { name: string | null; image: string | null } | null;
+}
+
+function MobileTopBar({ label, user }: MobileTopBarProps) {
   return (
     <header className="flex items-center justify-between px-4 h-14 bg-surface border-b border-border shrink-0">
       {/* Brand */}
@@ -99,23 +106,23 @@ function MobileTopBar({ label }: { label: string }) {
         {label}
       </span>
 
-      {/* Right: notification + avatar */}
+      {/* Right: avatar */}
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          aria-label="Notifications"
-          className="w-9 h-9 rounded-full bg-surface-bg text-text-secondary inline-flex items-center justify-center hover:bg-border/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
-        >
-          <Icon name="Bell" size={18} />
-        </button>
-        <button
-          type="button"
-          aria-label="Sign out"
-          onClick={() => router.push(ROUTES.LOGIN)}
-          className="w-8 h-8 rounded-full bg-brand-navy inline-flex items-center justify-center text-[12px] font-bold text-white font-body shrink-0 hover:bg-brand-navy-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
-        >
-          OR
-        </button>
+        {user?.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={user.image}
+            alt={user.name ?? "User avatar"}
+            className="w-8 h-8 rounded-full object-cover shrink-0 border border-border"
+          />
+        ) : (
+          <div
+            className="w-8 h-8 rounded-full bg-brand-navy inline-flex items-center justify-center text-[12px] font-bold text-white font-body shrink-0"
+            aria-label={user?.name ?? "User avatar"}
+          >
+            {initials(user?.name)}
+          </div>
+        )}
       </div>
     </header>
   );
@@ -171,6 +178,10 @@ export default function ManagementLayout({
   const router = useRouter();
   const pathname = usePathname();
   const activeNav = getActiveNav(pathname);
+  const { data: currentUser } = useCurrentUser();
+  const user = currentUser
+    ? { name: currentUser.name, image: currentUser.image }
+    : null;
 
   const handleNav = (id: string) => {
     const route = NAV_ROUTES[id];
@@ -185,7 +196,7 @@ export default function ManagementLayout({
       <div className="flex lg:hidden flex-col min-h-screen bg-surface-bg">
         {/* Sticky top bar */}
         <div className="sticky top-0 z-20">
-          <MobileTopBar label={pageLabel} />
+          <MobileTopBar label={pageLabel} user={user} />
         </div>
 
         {/* Scrollable content */}
@@ -200,7 +211,7 @@ export default function ManagementLayout({
       {/* ── DESKTOP (≥ lg) — fixed sidebar + scrollable content ── */}
       <div className="hidden lg:flex h-screen overflow-hidden w-full">
         <div className="fixed top-0 left-0 h-screen z-30">
-          <OrgSidebar active={activeNav} onNav={handleNav} />
+          <OrgSidebar active={activeNav} onNav={handleNav} user={user} />
         </div>
         <div className="flex flex-col flex-1 ml-[220px] h-screen overflow-hidden">
           <main className="flex-1 overflow-y-auto bg-surface-bg">
