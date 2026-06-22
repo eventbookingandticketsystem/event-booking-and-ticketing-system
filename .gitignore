@@ -44,3 +44,6 @@ next-env.d.ts
 /design-reference
 AGENTS.md
 CLAUDE.md
+atlas-credentials.env
+client_secret_2_400149170823-9bpfcn6237lr5vcda1rl88od66uuso8q.apps.googleusercontent.com.json
+*.log

@@ -4,47 +4,44 @@ import { useState } from "react";
 import { StatusPill } from "@/components/Shared/StatusPill";
 import { EmptyState } from "@/components/Shared/EmptyState";
 import { AlertBanner } from "@/components/Shared/AlertBanner";
+import { SkeletonCard } from "@/components/Shared/SkeletonCard";
 import { Icon } from "@/components/Shared/Icon";
-import { ALL_EVENTS } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
+import { useAdminEvents } from "@/lib/api/hooks/useAdminData";
 import type { AdminEventRow } from "@/types/event";
 
-type PageState = "loaded" | "loading" | "empty";
 type FilterTab = "All" | "Upcoming" | "Ongoing" | "Completed" | "Flagged";
 
 const FILTER_TABS: FilterTab[] = ["All", "Upcoming", "Ongoing", "Completed", "Flagged"];
 
-export default function AdminEventsPage() {
-  const [state, setState] = useState<PageState>("loaded");
-  const [filter, setFilter] = useState<FilterTab>("All");
-  const [q, setQ] = useState("");
+const FILTER_TO_STATUS: Record<FilterTab, string | undefined> = {
+  All:       undefined,
+  Upcoming:  "PUBLISHED",
+  Ongoing:   "ONGOING",
+  Completed: "COMPLETED",
+  Flagged:   undefined,  // all statuses, then filter fraud > 5 client-side
+};
 
-  let rows: AdminEventRow[] = state === "empty" ? [] : ALL_EVENTS;
-  if (filter === "Flagged") rows = rows.filter((e) => e.fraud > 5);
-  else if (filter !== "All") rows = rows.filter((e) => e.status === filter);
-  rows = rows.filter((e) => e.name.toLowerCase().includes(q.toLowerCase()));
+export default function AdminEventsPage() {
+  const [filter, setFilter] = useState<FilterTab>("All");
+  const [q,      setQ]      = useState("");
+
+  const { data: result, isLoading, isError, error } = useAdminEvents({
+    status: FILTER_TO_STATUS[filter],
+    search: q || undefined,
+    limit:  50,
+  });
+
+  const allRows = result?.data ?? [];
+
+  // Flagged: events with fraud > 5 — currently 0 in real data since fraud field is always 0
+  // (scan-level fraud query not included in list endpoint). Show all with note.
+  const rows: AdminEventRow[] = filter === "Flagged"
+    ? allRows.filter((e) => e.fraud > 5)
+    : allRows;
 
   return (
     <div className="flex flex-col min-h-full">
-      {/* Demo state toggle */}
-      <div className="flex gap-2 px-6 pt-4">
-        {(["loaded", "loading", "empty"] as PageState[]).map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setState(s)}
-            className={cn(
-              "px-3 py-1 rounded-sm text-xs font-semibold border transition-colors",
-              state === s
-                ? "bg-brand-navy text-white border-brand-navy"
-                : "border-border text-text-secondary hover:border-brand-navy/30",
-            )}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
-
       <div className="px-6 pt-5 pb-10 flex flex-col gap-5">
         {/* Page header */}
         <div>
@@ -73,18 +70,27 @@ export default function AdminEventsPage() {
           ))}
         </div>
 
-        {/* Flagged warning */}
-        {filter === "Flagged" && rows.length > 0 && (
+        {/* Error */}
+        {isError && (
           <AlertBanner
-            tone="warning"
-            title="Elevated fraud activity"
-            message="These events have more than 5 fraud attempts and may need review."
+            tone="danger"
+            title="Could not load events"
+            message={error?.message ?? "Please try again."}
+          />
+        )}
+
+        {/* Flagged banner */}
+        {filter === "Flagged" && !isLoading && (
+          <AlertBanner
+            tone="info"
+            title="Fraud data coming soon"
+            message="Per-event fraud counts require scan aggregation — currently showing 0. This will be live once scan history is indexed."
           />
         )}
 
         {/* Search */}
-        {state !== "loading" && state !== "empty" && (
-          <div className="flex items-center gap-2 h-10 px-3.5 border border-border rounded-sm bg-white max-w-[360px] focus-within:border-brand-orange focus-within:ring-2 focus-within:ring-brand-orange/20 transition-colors">
+        {!isLoading && !isError && (
+          <div className="flex items-center gap-2 h-10 px-3.5 border border-border rounded-sm bg-white max-w-90 focus-within:border-brand-orange focus-within:ring-2 focus-within:ring-brand-orange/20 transition-colors">
             <Icon name="Search" size={16} className="text-text-muted shrink-0" />
             <input
               type="search"
@@ -97,8 +103,15 @@ export default function AdminEventsPage() {
           </div>
         )}
 
-        {/* Empty / no results */}
-        {(state === "empty" || (state === "loaded" && rows.length === 0)) && (
+        {/* Loading */}
+        {isLoading && (
+          <div className="flex flex-col gap-3">
+            {[0,1,2,3,4].map((i) => <SkeletonCard key={i} className="h-12" />)}
+          </div>
+        )}
+
+        {/* Empty */}
+        {!isLoading && !isError && rows.length === 0 && (
           <div className="bg-surface border border-border rounded-lg p-6">
             <EmptyState
               icon="CalendarOff"
@@ -109,7 +122,7 @@ export default function AdminEventsPage() {
         )}
 
         {/* Table */}
-        {state !== "empty" && rows.length > 0 && (
+        {!isLoading && !isError && rows.length > 0 && (
           <div className="bg-surface border border-border rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm" aria-label="All events table">
@@ -125,62 +138,47 @@ export default function AdminEventsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {state === "loading"
-                    ? Array.from({ length: 5 }).map((_, i) => (
-                        <tr key={i} className="border-b border-border/50">
-                          <td className="px-5 py-4"><div className="h-4 w-40 skeleton rounded" /></td>
-                          <td className="px-4 py-4"><div className="h-3 w-24 skeleton rounded" /></td>
-                          <td className="px-4 py-4"><div className="h-3 w-16 skeleton rounded" /></td>
-                          <td className="px-4 py-4"><div className="h-3 w-12 skeleton rounded" /></td>
-                          <td className="px-4 py-4"><div className="h-3 w-8 skeleton rounded" /></td>
-                          <td className="px-4 py-4"><div className="h-5 w-16 skeleton rounded-pill" /></td>
-                          <td className="px-5 py-4 text-right"><div className="h-7 w-20 skeleton rounded ml-auto" /></td>
-                        </tr>
-                      ))
-                    : rows.map((e) => (
-                        <tr key={e.id} className="border-b border-border/50 last:border-b-0 hover:bg-surface-bg/50">
-                          <td className="px-5 py-3.5 font-semibold">{e.name}</td>
-                          <td className="px-4 py-3.5 text-text-muted">{e.organizer}</td>
-                          <td className="px-4 py-3.5">{e.date}</td>
-                          <td className="px-4 py-3.5 font-mono text-[13px]">{e.sold.toLocaleString()}</td>
-                          <td className="px-4 py-3.5">
-                            <span
-                              className={cn(
-                                "font-mono text-[13px]",
-                                e.fraud > 5 ? "text-status-danger font-semibold" : "text-text",
-                              )}
-                            >
-                              {e.fraud}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3.5"><StatusPill status={e.status} /></td>
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                type="button"
-                                aria-label={`View ${e.name}`}
-                                className="w-8 h-8 rounded border border-border text-text-secondary inline-flex items-center justify-center hover:border-brand-orange/40 hover:text-brand-orange transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
-                              >
-                                <Icon name="Eye" size={15} />
-                              </button>
-                              <button
-                                type="button"
-                                aria-label={`Flag ${e.name}`}
-                                className="w-8 h-8 rounded border border-border text-text-secondary inline-flex items-center justify-center hover:border-status-warning/40 hover:text-status-warning transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-warning"
-                              >
-                                <Icon name="Flag" size={15} />
-                              </button>
-                              <button
-                                type="button"
-                                aria-label={`Remove ${e.name}`}
-                                className="w-8 h-8 rounded border border-border text-text-secondary inline-flex items-center justify-center hover:border-status-danger/40 hover:text-status-danger transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-danger"
-                              >
-                                <Icon name="Trash2" size={15} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                  {rows.map((e) => (
+                    <tr key={e.id} className="border-b border-border/50 last:border-b-0 hover:bg-surface-bg/50">
+                      <td className="px-5 py-3.5 font-semibold">{e.name}</td>
+                      <td className="px-4 py-3.5 text-text-muted">{e.organizer}</td>
+                      <td className="px-4 py-3.5">{e.date}</td>
+                      <td className="px-4 py-3.5 font-mono text-[13px]">{e.sold.toLocaleString()}</td>
+                      <td className="px-4 py-3.5">
+                        <span className={cn("font-mono text-[13px]", e.fraud > 5 ? "text-status-danger font-semibold" : "text-text")}>
+                          {e.fraud}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <StatusPill status={e.status as Parameters<typeof StatusPill>[0]["status"]} />
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            aria-label={`View ${e.name}`}
+                            className="w-8 h-8 rounded border border-border text-text-secondary inline-flex items-center justify-center hover:border-brand-orange/40 hover:text-brand-orange transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
+                          >
+                            <Icon name="Eye" size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`Flag ${e.name}`}
+                            className="w-8 h-8 rounded border border-border text-text-secondary inline-flex items-center justify-center hover:border-status-warning/40 hover:text-status-warning transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-warning"
+                          >
+                            <Icon name="Flag" size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`Remove ${e.name}`}
+                            className="w-8 h-8 rounded border border-border text-text-secondary inline-flex items-center justify-center hover:border-status-danger/40 hover:text-status-danger transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-danger"
+                          >
+                            <Icon name="Trash2" size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

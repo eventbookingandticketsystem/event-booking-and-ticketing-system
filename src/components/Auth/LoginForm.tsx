@@ -1,61 +1,126 @@
-'use client';
+"use client";
 
 import { useState } from "react";
+import { signIn, getSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { PhoneInput } from "@/components/Shared/PhoneInput";
 import { Button } from "@/components/Shared/Button";
 import { AlertBanner } from "@/components/Shared/AlertBanner";
 import { Icon } from "@/components/Shared/Icon";
+import { FcGoogle } from "react-icons/fc";
 import { DEFAULT_PHONE, type PhoneValue } from "@/constants/countries";
 import { cn } from "@/lib/utils";
+import { ROUTES } from "@/constants/routes";
 
 interface LoginFormProps {
-  onSuccess: () => void;
   onRegister: () => void;
   onForgot: () => void;
-  /** Optional pre-set banner shown above the form (from URL param) */
-  banner?: { tone: "success" | "danger" | "warning" | "info"; message: string } | null;
-  /** Show server-side credential error banner */
-  showError?: boolean;
+  /** Optional pre-set banner from URL param (booking redirect, registered, etc.) */
+  banner?: {
+    tone: "success" | "danger" | "warning" | "info";
+    message: string;
+  } | null;
+  /**
+   * Where to redirect after successful sign-in.
+   * Overrides the role-based default route when set.
+   * Must be a relative path (no cross-origin redirects).
+   */
+  callbackUrl?: string | null;
 }
 
-export function LoginForm({
-  onSuccess,
-  onRegister,
-  onForgot,
-  banner,
-  showError = false,
-}: LoginFormProps) {
+// Map DB role string → destination route
+function roleRoute(role: unknown): string {
+  switch (role) {
+    case "ORGANIZER":
+      return ROUTES.ORGANIZER;
+    case "GATE_AGENT":
+      return ROUTES.AGENT;
+    case "ADMIN":
+      return ROUTES.ADMIN;
+    default:
+      return ROUTES.DASHBOARD; // ATTENDEE + fallback
+  }
+}
+
+export function LoginForm({ onRegister, onForgot, banner, callbackUrl }: LoginFormProps) {
+  const router = useRouter();
+
   const [phone, setPhone] = useState<PhoneValue>(DEFAULT_PHONE);
   const [pw, setPw] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [touched, setTouched] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isGoogleSign, setIsGoogleSign] = useState(false);
 
   // Inline validation
   const errors = {
     phone: !phone.num
       ? "Phone number is required"
       : phone.num.length < 7
-      ? "Enter a valid phone number"
-      : "",
+        ? "Enter a valid phone number"
+        : "",
     pw: !pw
       ? "Password is required"
       : pw.length < 6
-      ? "At least 6 characters"
-      : "",
+        ? "At least 6 characters"
+        : "",
   };
   const isValid = !errors.phone && !errors.pw;
   const fieldError = (k: keyof typeof errors) => (touched ? errors[k] : "");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // ── Phone + password sign-in ──────────────────────────────────────────────
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setTouched(true);
     if (!isValid) return;
+
     setLoading(true);
-    setTimeout(() => {
+    setAuthError(null);
+
+    // Combine dial code + local number: "+211" + "912000001" → "+211912000001"
+    const fullPhone = phone.dial + phone.num;
+
+    const result = await signIn("credentials", {
+      phone: fullPhone,
+      password: pw,
+      redirect: false,
+    });
+
+    if (!result?.ok || result.error) {
+      setAuthError("Invalid credentials. Check your details and try again.");
       setLoading(false);
-      onSuccess();
-    }, 1100);
+      return;
+    }
+
+    // callbackUrl takes precedence (e.g. "book this event" redirect).
+    // Fall back to role-based default dashboard.
+    if (callbackUrl && callbackUrl.startsWith("/")) {
+      router.push(callbackUrl);
+      return;
+    }
+
+    // Read role from the refreshed session and redirect accordingly.
+    const session = await getSession();
+    const role = (session?.user as Record<string, unknown> | undefined)?.role;
+
+    router.push(roleRoute(role));
+  };
+
+  // ── Google OAuth sign-in ──────────────────────────────────────────────────
+  const handleGoogleAuth = async () => {
+    setIsGoogleSign(true);
+    try {
+      await signIn("google", {
+        redirect: true,
+        callbackUrl: ROUTES.DASHBOARD,
+      });
+    } catch {
+      // signIn with redirect:true only throws on network errors before redirect
+      setAuthError("Google sign-in failed. Please try again.");
+    } finally {
+      setIsGoogleSign(false);
+    }
   };
 
   return (
@@ -66,22 +131,20 @@ export function LoginForm({
     >
       {/* Card heading */}
       <div className="flex flex-col gap-1">
-        <h2 className="font-display font-bold text-2xl text-text m-0">Sign in</h2>
+        <h2 className="font-display font-bold text-2xl text-text m-0">
+          Sign in
+        </h2>
         <p className="text-[15px] text-text-secondary m-0">
           Welcome back. Enter your details to continue.
         </p>
       </div>
 
-      {/* Banner from URL param */}
+      {/* Banner from URL param (booking redirect, registration success, etc.) */}
       {banner && <AlertBanner tone={banner.tone} message={banner.message} />}
 
-      {/* Credential error */}
-      {showError && (
-        <AlertBanner
-          tone="danger"
-          title="Incorrect phone number or password"
-          message="Check your details and try again."
-        />
+      {/* Auth error — shown only after a failed signIn attempt */}
+      {authError && (
+        <AlertBanner tone="danger" title="Sign-in failed" message={authError} />
       )}
 
       {/* Phone */}
@@ -94,7 +157,10 @@ export function LoginForm({
 
       {/* Password */}
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="login-pw" className="text-sm font-semibold text-text font-body">
+        <label
+          htmlFor="login-pw"
+          className="text-sm font-semibold text-text font-body"
+        >
           Password
         </label>
         <div
@@ -127,7 +193,11 @@ export function LoginForm({
           </button>
         </div>
         {fieldError("pw") && (
-          <p id="login-pw-error" role="alert" className="text-xs text-status-danger font-semibold">
+          <p
+            id="login-pw-error"
+            role="alert"
+            className="text-xs text-status-danger font-semibold"
+          >
             {fieldError("pw")}
           </p>
         )}
@@ -144,19 +214,49 @@ export function LoginForm({
         </button>
       </div>
 
-      {/* Submit */}
+      {/* Phone + password submit */}
       <Button
         type="submit"
         size="lg"
         fullWidth
         loading={loading}
-        disabled={loading}
+        disabled={loading || isGoogleSign}
         className="gap-2"
       >
-        {loading ? "Signing in…" : (
+        {loading ? (
+          "Signing in…"
+        ) : (
           <>
             Sign in
             <Icon name="ArrowRight" size={18} />
+          </>
+        )}
+      </Button>
+
+      {/* Divider */}
+      <div className="flex items-center gap-3 text-[13px] text-text-secondary">
+        <span className="flex-1 h-px bg-border" />
+        or
+        <span className="flex-1 h-px bg-border" />
+      </div>
+
+      {/* Google OAuth */}
+      <Button
+        type="button"
+        variant="ghost"
+        size="lg"
+        fullWidth
+        loading={isGoogleSign}
+        disabled={loading || isGoogleSign}
+        className="gap-2 border-border"
+        onClick={handleGoogleAuth}
+      >
+        {isGoogleSign ? (
+          "Redirecting…"
+        ) : (
+          <>
+            <FcGoogle name="Google" size={20} aria-hidden="true" />
+            Continue with Google
           </>
         )}
       </Button>

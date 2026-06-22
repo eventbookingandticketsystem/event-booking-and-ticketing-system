@@ -1,17 +1,37 @@
 'use client';
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { CldUploadWidget } from "next-cloudinary";
 import { OrgTopbar } from "@/components/Organizer/OrgTopbar";
 import { Button } from "@/components/Shared/Button";
 import { Icon } from "@/components/Shared/Icon";
 import { AlertBanner } from "@/components/Shared/AlertBanner";
 import { cn } from "@/lib/utils";
-import { addCreatedEvent } from "@/lib/created-events";
+import { useCreateEvent } from "@/lib/api/hooks/useCreateEvent";
 import { ROUTES } from "@/constants/routes";
 
 const STEP_LABELS = ["Event details", "Ticket categories", "Review & publish"];
-const CATEGORIES = ["Concert", "Football", "Conference", "Graduation", "Other"] as const;
+
+// Predefined suggestions — user can also type anything freely
+const EVENT_CATEGORY_SUGGESTIONS = [
+  "Music", "Sports", "Conference", "Graduation", "Church",
+  "Food & Drinks", "Arts & Culture", "Comedy", "Fashion", "Tech",
+  "Networking", "Workshop", "Exhibition", "Other",
+];
+
+const TIER_NAME_SUGGESTIONS = [
+  "General Admission", "VIP", "VIP Standing", "VIP Table",
+  "Early Bird", "Regular", "Premium", "Backstage Pass",
+  "Student", "Family Bundle", "Group (10+)",
+];
+
+const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET ?? "tiketi_events";
+
+interface CloudinaryResult {
+  public_id: string;
+  secure_url: string;
+}
 
 interface CatBlock {
   name: string;
@@ -25,10 +45,11 @@ interface Step1Fields {
   title: string;
   desc: string;
   venue: string;
+  city: string;
   date: string;
   time: string;
   category: string;
-  posterName: string;
+  imageUrl: string;
 }
 
 function isFutureDate(d: string): boolean {
@@ -38,6 +59,145 @@ function isFutureDate(d: string): boolean {
   return new Date(d) >= today;
 }
 
+// ── ComboInput ────────────────────────────────────────────────────────────────
+// Free-type input with suggestion dropdown.
+// - Shows suggestions filtered by what the user types (case-insensitive)
+// - Deduplicates: extra values passed via `extra` (e.g. already-used names)
+//   appear at the top, existing suggestions below, no duplicates shown
+// - User can type anything not in the list and it's accepted as-is
+interface ComboInputProps {
+  value: string;
+  onChange: (v: string) => void;
+  suggestions: string[];
+  extra?: string[];        // additional suggestions (e.g. already-used tier names)
+  placeholder?: string;
+  error?: string;
+  disabled?: boolean;
+  id?: string;
+}
+
+function ComboInput({
+  value, onChange, suggestions, extra = [],
+  placeholder, error, disabled, id,
+}: ComboInputProps) {
+  const [open, setOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Merge extra + suggestions, deduplicate case-insensitively, preserve order
+  const allSuggestions = [
+    ...extra,
+    ...suggestions.filter(
+      (s) => !extra.some((e) => e.toLowerCase() === s.toLowerCase()),
+    ),
+  ];
+
+  // Filter by what the user typed, skip exact match (already selected)
+  const filtered = value.trim()
+    ? allSuggestions.filter(
+        (s) =>
+          s.toLowerCase().includes(value.toLowerCase()) &&
+          s.toLowerCase() !== value.toLowerCase(),
+      )
+    : allSuggestions;
+
+  const showDropdown = open && focused && filtered.length > 0;
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setFocused(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div
+        className={cn(
+          "flex items-stretch h-11 border rounded-sm bg-white transition-colors",
+          error
+            ? "border-status-danger"
+            : focused
+            ? "border-brand-orange ring-2 ring-brand-orange/20"
+            : "border-border",
+          disabled && "opacity-60",
+        )}
+      >
+        <input
+          ref={inputRef}
+          id={id}
+          type="text"
+          value={value}
+          placeholder={placeholder}
+          disabled={disabled}
+          autoComplete="off"
+          onChange={(e) => {
+            onChange(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => { setFocused(true); setOpen(true); }}
+          onBlur={() => {
+            // small delay so click on option registers before blur closes
+            setTimeout(() => setFocused(false), 150);
+          }}
+          aria-autocomplete="list"
+          aria-expanded={showDropdown}
+          className="flex-1 border-none outline-none bg-transparent px-3.5 text-[15px] text-text font-body placeholder:text-text-muted min-w-0"
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => { setOpen((o) => !o); inputRef.current?.focus(); }}
+          aria-label="Show suggestions"
+          className="px-2.5 text-text-muted hover:text-text"
+        >
+          <Icon name={open && focused ? "ChevronUp" : "ChevronDown"} size={15} />
+        </button>
+      </div>
+
+      {showDropdown && (
+        <ul
+          role="listbox"
+          className="absolute top-[calc(100%+4px)] left-0 right-0 z-50 bg-white border border-border rounded-md shadow-pop max-h-[220px] overflow-y-auto"
+        >
+          {filtered.map((s) => (
+            <li key={s}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={s.toLowerCase() === value.toLowerCase()}
+                onMouseDown={(e) => {
+                  e.preventDefault(); // prevent blur before click
+                  onChange(s);
+                  setOpen(false);
+                  setFocused(false);
+                }}
+                className={cn(
+                  "w-full text-left px-3.5 py-2.5 text-[14px] font-body text-text hover:bg-surface-bg transition-colors",
+                  s.toLowerCase() === value.toLowerCase() && "bg-surface-alt font-semibold",
+                  extra.some((e) => e.toLowerCase() === s.toLowerCase()) &&
+                    "border-l-2 border-brand-orange",
+                )}
+              >
+                {s}
+                {extra.some((e) => e.toLowerCase() === s.toLowerCase()) && (
+                  <span className="ml-2 text-[11px] text-text-muted font-normal">already used</span>
+                )}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ── Step indicator ────────────────────────────────────────────────────────────
 function StepIndicator({ step }: { step: number }) {
   return (
     <div className="flex items-center gap-0 mb-8">
@@ -48,12 +208,7 @@ function StepIndicator({ step }: { step: number }) {
         return (
           <div key={label} className="flex items-center gap-0">
             {i > 0 && (
-              <div
-                className={cn(
-                  "h-px w-12 mx-1 transition-colors",
-                  done ? "bg-status-success" : "bg-border",
-                )}
-              />
+              <div className={cn("h-px w-12 mx-1 transition-colors", done ? "bg-status-success" : "bg-border")} />
             )}
             <div className="flex items-center gap-2">
               <span
@@ -66,14 +221,7 @@ function StepIndicator({ step }: { step: number }) {
               >
                 {done ? <Icon name="Check" size={14} strokeWidth={3} /> : n}
               </span>
-              <span
-                className={cn(
-                  "text-sm font-semibold hidden sm:inline",
-                  active && "text-text",
-                  done && "text-status-success",
-                  !active && !done && "text-text-muted",
-                )}
-              >
+              <span className={cn("text-sm font-semibold hidden sm:inline", active && "text-text", done && "text-status-success", !active && !done && "text-text-muted")}>
                 {label}
               </span>
             </div>
@@ -84,6 +232,7 @@ function StepIndicator({ step }: { step: number }) {
   );
 }
 
+// ── Field wrapper ─────────────────────────────────────────────────────────────
 function FieldWrap({ label, error, children, hint }: { label: string; error?: string; children: React.ReactNode; hint?: string }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -99,9 +248,8 @@ function FieldWrap({ label, error, children, hint }: { label: string; error?: st
   );
 }
 
-function TextInput({
-  value, onChange, placeholder, disabled, error, type = "text",
-}: {
+// ── Shared input primitives ───────────────────────────────────────────────────
+function TextInput({ value, onChange, placeholder, disabled, error, type = "text" }: {
   value: string; onChange: (v: string) => void; placeholder?: string;
   disabled?: boolean; error?: string; type?: string;
 }) {
@@ -121,9 +269,7 @@ function TextInput({
   );
 }
 
-function TextArea({
-  value, onChange, placeholder, error,
-}: {
+function TextArea({ value, onChange, placeholder, error }: {
   value: string; onChange: (v: string) => void; placeholder?: string; error?: string;
 }) {
   return (
@@ -141,37 +287,7 @@ function TextArea({
   );
 }
 
-function SelectInput({
-  value, onChange, options, placeholder, error,
-}: {
-  value: string; onChange: (v: string) => void; options: string[];
-  placeholder?: string; error?: string;
-}) {
-  return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={cn(
-          "w-full h-11 px-3.5 pr-9 rounded-sm border bg-white text-text text-[15px] font-body appearance-none transition-colors",
-          "focus:outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20",
-          error ? "border-status-danger" : "border-border",
-          !value && "text-text-muted",
-        )}
-      >
-        <option value="" disabled>{placeholder ?? "Select…"}</option>
-        {options.map((o) => (
-          <option key={o} value={o}>{o}</option>
-        ))}
-      </select>
-      <Icon name="ChevronDown" size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
-    </div>
-  );
-}
-
-function NumInput({
-  value, onChange, placeholder, min, error,
-}: {
+function NumInput({ value, onChange, placeholder, min, error }: {
   value: string; onChange: (v: string) => void; placeholder?: string;
   min?: number; error?: string;
 }) {
@@ -179,7 +295,7 @@ function NumInput({
     <input
       type="number"
       value={value}
-      onChange={(e) => onChange(e.target.value.replace(/[^0-9]/g, ""))}
+      onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ""))}
       placeholder={placeholder}
       min={min}
       className={cn(
@@ -191,43 +307,51 @@ function NumInput({
   );
 }
 
+// ── Page ─────────────────────────────────────────────────────────────────────
 export default function CreateEventPage() {
   const router = useRouter();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const createEvent = useCreateEvent();
 
-  const [step, setStep] = useState(1);
-  const [touched1, setTouched1] = useState(false);
-  const [touched2, setTouched2] = useState(false);
-  const [publishing, setPublishing] = useState(false);
+  const [step,        setStep]        = useState(1);
+  const [touched1,    setTouched1]    = useState(false);
+  const [touched2,    setTouched2]    = useState(false);
+  const [uploading,   setUploading]   = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
 
   const [f, setF] = useState<Step1Fields>({
-    title: "", desc: "", venue: "", date: "", time: "", category: "", posterName: "",
+    title: "", desc: "", venue: "", city: "",
+    date: "", time: "", category: "", imageUrl: "",
   });
   const set = (k: keyof Step1Fields) => (v: string) => setF((prev) => ({ ...prev, [k]: v }));
 
   const [cats, setCats] = useState<CatBlock[]>([
-    { name: "General Admission", price: "", capacity: "", open: "", close: "" },
+    { name: "", price: "", capacity: "", open: "", close: "" },
   ]);
 
-  // Step 1 validation
+  // Collect already-used tier names for suggestions (deduplicated, case-insensitive)
+  const usedTierNames = Array.from(
+    new Set(cats.map((c) => c.name.trim()).filter(Boolean).map((n) => n)),
+  );
+
+  // ── Validation ────────────────────────────────────────────────────────────
   const e1 = {
-    title: !f.title.trim() ? "Event title is required" : f.title.trim().length < 5 ? "At least 5 characters" : "",
-    desc: !f.desc.trim() ? "Description is required" : f.desc.trim().length < 20 ? "At least 20 characters" : "",
-    venue: !f.venue.trim() ? "Venue is required" : "",
-    date: !f.date ? "Pick a date" : !isFutureDate(f.date) ? "Must be a future date" : "",
-    time: !f.time ? "Pick a time" : "",
-    category: !f.category ? "Choose a category" : "",
+    title:    !f.title.trim() ? "Event title is required" : f.title.trim().length < 5 ? "At least 5 characters" : "",
+    desc:     !f.desc.trim() ? "Description is required" : f.desc.trim().length < 20 ? "At least 20 characters" : "",
+    venue:    !f.venue.trim() ? "Venue is required" : "",
+    city:     !f.city.trim() ? "City is required" : "",
+    date:     !f.date ? "Pick a date" : !isFutureDate(f.date) ? "Must be a future date" : "",
+    time:     !f.time ? "Pick a time" : "",
+    category: !f.category.trim() ? "Choose a category" : "",
   };
   const step1Valid = !Object.values(e1).some(Boolean);
   const err1 = (k: keyof typeof e1) => (touched1 ? e1[k] : "");
 
-  // Step 2 per-cat validation
   const catErr = (c: CatBlock) => ({
-    name: !c.name.trim() ? "Required" : "",
-    price: c.price === "" ? "Required" : Number(c.price) < 0 ? "Min $0" : "",
+    name:     !c.name.trim() ? "Required" : "",
+    price:    c.price === "" ? "Required" : Number(c.price) < 0 ? "Min $0" : "",
     capacity: c.capacity === "" ? "Required" : Number(c.capacity) < 1 ? "Min 1" : "",
-    open: !c.open ? "Required" : "",
-    close: !c.close ? "Required"
+    open:     !c.open ? "Required" : "",
+    close:    !c.close ? "Required"
       : (c.open && c.close < c.open) ? "Must be after sale opens"
       : (f.date && c.close > f.date) ? "Must be on or before event date"
       : "",
@@ -248,34 +372,62 @@ export default function CreateEventPage() {
     setStep((s) => s + 1);
   };
 
-  // Step 3 checks
   const checks = [
-    { label: "Event title",          ok: !e1.title },
-    { label: "Description",          ok: !e1.desc },
-    { label: "Venue",                ok: !e1.venue },
-    { label: "Date & time",          ok: !e1.date && !e1.time },
-    { label: "Category",             ok: !e1.category },
-    { label: "Ticket categories",    ok: step2Valid },
+    { label: "Event title",       ok: !e1.title },
+    { label: "Description",       ok: !e1.desc },
+    { label: "Venue & city",      ok: !e1.venue && !e1.city },
+    { label: "Date & time",       ok: !e1.date && !e1.time },
+    { label: "Category",          ok: !e1.category },
+    { label: "Ticket categories", ok: step2Valid },
   ];
   const allValid = checks.every((c) => c.ok);
 
-  const publish = () => {
-    if (!allValid || publishing) return;
-    setPublishing(true);
-    setTimeout(() => {
-      setPublishing(false);
-      addCreatedEvent({
-        id: `evt-new-${Date.now()}`,
-        name: f.title,
-        date: f.date || "TBD",
-        venue: f.venue,
-        sold: 0,
-        capacity: cats.reduce((s, c) => s + (Number(c.capacity) || 0), 0),
-        status: "Published" as const,
-        category: f.category,
-      });
+  function toIsoDatetime(date: string, time: string): string {
+    const [hours, minutes] = time ? time.split(":").map(Number) : [0, 0];
+    const d = new Date(date);
+    d.setHours(hours, minutes ?? 0, 0, 0);
+    return d.toISOString();
+  }
+
+  function buildPayload(status: "PUBLISHED" | "DRAFT") {
+    return {
+      title:       f.title,
+      description: f.desc || undefined,
+      venue:       f.venue,
+      city:        f.city,
+      date:        toIsoDatetime(f.date, f.time),
+      time:        f.time,
+      category:    f.category,
+      status,
+      ...(f.imageUrl ? { image: f.imageUrl } : {}),
+      tiers: cats.map((c) => ({
+        name:       c.name,
+        price:      Number(c.price),
+        capacity:   Number(c.capacity),
+        saleOpens:  c.open  ? toIsoDatetime(c.open,  "00:00") : undefined,
+        saleCloses: c.close ? toIsoDatetime(c.close, "23:59") : undefined,
+      })),
+    };
+  }
+
+  const publish = async () => {
+    if (!allValid || createEvent.isPending || savingDraft) return;
+    try {
+      await createEvent.mutateAsync(buildPayload("PUBLISHED"));
       router.push(ROUTES.ORGANIZER_EVENTS);
-    }, 1200);
+    } catch { /* surfaced via createEvent.error */ }
+  };
+
+  const saveAsDraft = async () => {
+    if (createEvent.isPending || savingDraft) return;
+    setTouched1(true);
+    if (!step1Valid) return;
+    setSavingDraft(true);
+    try {
+      await createEvent.mutateAsync(buildPayload("DRAFT"));
+      router.push(ROUTES.ORGANIZER_EVENTS);
+    } catch { /* surfaced via createEvent.error */ }
+    finally { setSavingDraft(false); }
   };
 
   return (
@@ -283,13 +435,8 @@ export default function CreateEventPage() {
       <OrgTopbar crumb="Create Event" />
 
       <div className="px-6 pt-5 pb-10">
-        {/* Breadcrumb */}
         <div className="flex items-center gap-1.5 text-sm font-body mb-3">
-          <button
-            type="button"
-            onClick={() => router.push(ROUTES.ORGANIZER_EVENTS)}
-            className="text-text-secondary hover:text-text transition-colors focus-visible:outline-none"
-          >
+          <button type="button" onClick={() => router.push(ROUTES.ORGANIZER_EVENTS)} className="text-text-secondary hover:text-text transition-colors focus-visible:outline-none">
             My events
           </button>
           <Icon name="ChevronRight" size={14} className="text-text-muted" />
@@ -297,29 +444,40 @@ export default function CreateEventPage() {
         </div>
 
         <h1 className="font-display font-bold text-[26px] text-text mb-6">Create event</h1>
-
-        {/* Step indicator */}
         <StepIndicator step={step} />
 
+        {createEvent.isError && step !== 3 && (
+          <div className="max-w-[760px] mb-4">
+            <AlertBanner tone="danger" title="Could not save event" message={createEvent.error?.message ?? "An error occurred. Please try again."} />
+          </div>
+        )}
+
         <div className="max-w-[760px]">
-          {/* ── STEP 1 ── */}
+
+          {/* ── STEP 1 — Event details ──────────────────────────────────── */}
           {step === 1 && (
             <div className="bg-surface border border-border rounded-lg overflow-hidden">
               <div className="px-6 py-4 border-b border-border">
                 <h2 className="font-display font-semibold text-[17px] text-text m-0">Event details</h2>
               </div>
               <div className="p-6 flex flex-col gap-5">
+
                 <FieldWrap label="Event title" error={err1("title")}>
-                  <TextInput value={f.title} onChange={set("title")} placeholder="e.g. Juba Music Festival 2025" error={err1("title")} />
+                  <TextInput value={f.title} onChange={set("title")} placeholder="e.g. Summer Concert 2025" error={err1("title")} />
                 </FieldWrap>
 
                 <FieldWrap label="Description" error={err1("desc")} hint="At least 20 characters">
                   <TextArea value={f.desc} onChange={set("desc")} placeholder="Tell attendees what to expect…" error={err1("desc")} />
                 </FieldWrap>
 
-                <FieldWrap label="Venue" error={err1("venue")}>
-                  <TextInput value={f.venue} onChange={set("venue")} placeholder="e.g. Nyakuron Cultural Centre" error={err1("venue")} />
-                </FieldWrap>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <FieldWrap label="Venue" error={err1("venue")}>
+                    <TextInput value={f.venue} onChange={set("venue")} placeholder="e.g. City Arena" error={err1("venue")} />
+                  </FieldWrap>
+                  <FieldWrap label="City" error={err1("city")}>
+                    <TextInput value={f.city} onChange={set("city")} placeholder="e.g. Nairobi" error={err1("city")} />
+                  </FieldWrap>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <FieldWrap label="Date" error={err1("date")}>
@@ -330,60 +488,71 @@ export default function CreateEventPage() {
                   </FieldWrap>
                 </div>
 
-                <FieldWrap label="Category" error={err1("category")}>
-                  <SelectInput
+                {/* Category — ComboInput with suggestions + free-type */}
+                <FieldWrap label="Category" error={err1("category")} hint="Select from the list or type your own">
+                  <ComboInput
                     value={f.category}
                     onChange={set("category")}
-                    options={[...CATEGORIES]}
-                    placeholder="Select a category"
+                    suggestions={EVENT_CATEGORY_SUGGESTIONS}
+                    placeholder="e.g. Music, Conference, Sports…"
                     error={err1("category")}
                   />
                 </FieldWrap>
 
-                {/* Poster upload */}
-                <FieldWrap label="Event poster (optional)">
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/png,image/jpeg"
-                    className="sr-only"
-                    aria-label="Upload event poster"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) set("posterName")(file.name);
+                {/* Cloudinary poster upload */}
+                <FieldWrap label="Event poster (optional)" hint="Recommended 1200×628px · PNG or JPG · max 5 MB">
+                  <CldUploadWidget
+                    uploadPreset={UPLOAD_PRESET}
+                    options={{ sources: ["local", "url"], multiple: false, maxFiles: 1, clientAllowedFormats: ["jpg", "jpeg", "png", "webp"], maxFileSize: 5_242_880 }}
+                    onQueuesStart={() => setUploading(true)}
+                    onSuccess={(result) => {
+                      setUploading(false);
+                      if (result.event !== "success") return;
+                      const info = result.info as CloudinaryResult;
+                      set("imageUrl")(info.secure_url);
                     }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fileRef.current?.click()}
-                    className={cn(
-                      "w-full flex flex-col items-center justify-center gap-2 px-6 py-8 border-2 border-dashed rounded-lg transition-colors",
-                      f.posterName
-                        ? "border-status-success bg-status-success-bg"
-                        : "border-border bg-surface-bg hover:border-brand-orange/40",
-                    )}
+                    onError={() => setUploading(false)}
                   >
-                    <Icon name={f.posterName ? "Check" : "CloudUpload"} size={26} className={f.posterName ? "text-status-success" : "text-text-muted"} />
-                    <p className="text-sm font-semibold text-text">
-                      {f.posterName || "Upload event poster"}
-                    </p>
-                    <p className="text-xs text-text-muted">
-                      {f.posterName ? "Click to change" : "Recommended 1200x628px · PNG or JPG · max 5 MB"}
-                    </p>
-                  </button>
+                    {({ open }) => (
+                      <button
+                        type="button"
+                        onClick={() => open()}
+                        disabled={uploading}
+                        aria-label="Upload event poster"
+                        className={cn(
+                          "w-full flex flex-col items-center justify-center gap-2 px-6 py-8 border-2 border-dashed rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange",
+                          f.imageUrl ? "border-status-success bg-status-success-bg" : "border-border bg-surface-bg hover:border-brand-orange/40",
+                          uploading && "opacity-60 cursor-wait",
+                        )}
+                      >
+                        {f.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={f.imageUrl} alt="Event poster preview" className="w-full max-h-40 object-cover rounded-md mb-1" />
+                        ) : (
+                          <Icon name={uploading ? "Loader" : "CloudUpload"} size={26} className={cn("text-text-muted", uploading && "animate-spin")} />
+                        )}
+                        <p className="text-sm font-semibold text-text">
+                          {uploading ? "Uploading…" : f.imageUrl ? "Poster uploaded · click to change" : "Upload event poster"}
+                        </p>
+                        {!f.imageUrl && !uploading && <p className="text-xs text-text-muted">PNG, JPG or WebP · max 5 MB</p>}
+                      </button>
+                    )}
+                  </CldUploadWidget>
                 </FieldWrap>
 
-                <div className="flex justify-end pt-2">
+                <div className="flex items-center justify-between pt-2">
+                  <Button variant="ghost" onClick={saveAsDraft} disabled={savingDraft} className="gap-2 text-text-secondary" aria-label="Save as draft">
+                    {savingDraft ? <><Icon name="Loader" size={14} className="animate-spin" /> Saving…</> : <><Icon name="Save" size={14} /> Save as draft</>}
+                  </Button>
                   <Button onClick={next} className="gap-2">
-                    Next
-                    <Icon name="ArrowRight" size={16} />
+                    Next <Icon name="ArrowRight" size={16} />
                   </Button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* ── STEP 2 ── */}
+          {/* ── STEP 2 — Ticket categories ──────────────────────────────── */}
           {step === 2 && (
             <div className="bg-surface border border-border rounded-lg overflow-hidden">
               <div className="px-6 py-4 border-b border-border flex items-center justify-between">
@@ -407,20 +576,34 @@ export default function CreateEventPage() {
                       )}
                     </div>
                     <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                      {/* Category name — ComboInput with tier name suggestions */}
                       <div className="md:col-span-2">
-                        <FieldWrap label="Category name" error={ce(c, "name")}>
-                          <TextInput value={c.name} onChange={(v) => setCat(i, "name", v)} placeholder="e.g. VIP" error={ce(c, "name")} />
+                        <FieldWrap label="Category name" error={ce(c, "name")} hint="Select a common name or type your own">
+                          <ComboInput
+                            value={c.name}
+                            onChange={(v) => setCat(i, "name", v)}
+                            suggestions={TIER_NAME_SUGGESTIONS}
+                            extra={usedTierNames.filter((n) => n.toLowerCase() !== c.name.toLowerCase())}
+                            placeholder="e.g. General Admission, VIP…"
+                            error={ce(c, "name")}
+                          />
                         </FieldWrap>
                       </div>
+
+                      {/* Price — USD */}
                       <FieldWrap label="Price (USD)" error={ce(c, "price")}>
                         <NumInput value={c.price} onChange={(v) => setCat(i, "price", v)} placeholder="0" min={0} error={ce(c, "price")} />
                       </FieldWrap>
+
                       <FieldWrap label="Capacity" error={ce(c, "capacity")}>
                         <NumInput value={c.capacity} onChange={(v) => setCat(i, "capacity", v)} placeholder="0" min={1} error={ce(c, "capacity")} />
                       </FieldWrap>
+
                       <FieldWrap label="Sale opens" error={ce(c, "open")}>
                         <TextInput type="date" value={c.open} onChange={(v) => setCat(i, "open", v)} error={ce(c, "open")} />
                       </FieldWrap>
+
                       <FieldWrap label="Sale closes" error={ce(c, "close")}>
                         <TextInput type="date" value={c.close} onChange={(v) => setCat(i, "close", v)} error={ce(c, "close")} />
                       </FieldWrap>
@@ -428,57 +611,57 @@ export default function CreateEventPage() {
                   </div>
                 ))}
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={cats.length >= 10}
-                  onClick={addCat}
-                  className="gap-2 self-start"
-                >
-                  <Icon name="Plus" size={15} />
-                  Add category
+                <Button variant="ghost" size="sm" disabled={cats.length >= 10} onClick={addCat} className="gap-2 self-start">
+                  <Icon name="Plus" size={15} /> Add category
                 </Button>
 
                 <div className="flex items-center justify-between pt-2">
                   <Button variant="ghost" onClick={() => setStep(1)} className="gap-2">
-                    <Icon name="ArrowLeft" size={16} />
-                    Back
+                    <Icon name="ArrowLeft" size={16} /> Back
                   </Button>
-                  <Button onClick={next} className="gap-2">
-                    Next
-                    <Icon name="ArrowRight" size={16} />
-                  </Button>
+                  <div className="flex gap-3">
+                    <Button variant="ghost" onClick={saveAsDraft} disabled={savingDraft} className="gap-2 text-text-secondary">
+                      {savingDraft ? <><Icon name="Loader" size={14} className="animate-spin" /> Saving…</> : <><Icon name="Save" size={14} /> Save as draft</>}
+                    </Button>
+                    <Button onClick={next} className="gap-2">
+                      Next <Icon name="ArrowRight" size={16} />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* ── STEP 3 ── */}
+          {/* ── STEP 3 — Review & publish ───────────────────────────────── */}
           {step === 3 && (
             <div className="flex flex-col gap-4">
-              {/* Review summary */}
               <div className="bg-surface border border-border rounded-lg overflow-hidden">
                 <div className="px-6 py-4 border-b border-border">
                   <h2 className="font-display font-semibold text-[17px] text-text m-0">Review</h2>
                 </div>
-                <div className="p-6">
+                <div className="p-6 flex flex-col gap-5">
+                  {f.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={f.imageUrl} alt="Event poster" className="w-full max-h-52 object-cover rounded-lg" />
+                  )}
                   <div className="grid grid-cols-2 gap-x-8 gap-y-4">
                     {[
-                      { label: "Title",     value: f.title || "—" },
-                      { label: "Category",  value: f.category || "—" },
-                      { label: "Venue",     value: f.venue || "—" },
+                      { label: "Title",       value: f.title || "—" },
+                      { label: "Category",    value: f.category || "—" },
+                      { label: "Venue",       value: f.venue || "—" },
+                      { label: "City",        value: f.city || "—" },
                       { label: "Date & time", value: f.date ? `${f.date} ${f.time}` : "—" },
+                      { label: "Poster",      value: f.imageUrl ? "Uploaded ✓" : "No poster" },
                     ].map((row) => (
                       <div key={row.label}>
                         <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-1">{row.label}</div>
-                        <div className="font-semibold text-text">{row.value}</div>
+                        <div className={cn("font-semibold text-text", row.label === "Poster" && f.imageUrl && "text-status-success")}>{row.value}</div>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
 
-              {/* Ticket categories summary */}
               <div className="bg-surface border border-border rounded-lg overflow-hidden">
                 <div className="px-6 py-4 border-b border-border">
                   <h2 className="font-display font-semibold text-[17px] text-text m-0">Ticket categories</h2>
@@ -488,7 +671,7 @@ export default function CreateEventPage() {
                     <thead>
                       <tr className="border-b border-border bg-surface-bg">
                         <th className="text-left px-5 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wide">Category</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wide">Price</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wide">Price (USD)</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wide">Capacity</th>
                       </tr>
                     </thead>
@@ -507,7 +690,6 @@ export default function CreateEventPage() {
                 </div>
               </div>
 
-              {/* Validation summary */}
               <div className="bg-surface border border-border rounded-lg overflow-hidden">
                 <div className="px-6 py-4 border-b border-border">
                   <h2 className="font-display font-semibold text-[17px] text-text m-0">Validation summary</h2>
@@ -515,11 +697,7 @@ export default function CreateEventPage() {
                 <div className="divide-y divide-border">
                   {checks.map((c) => (
                     <div key={c.label} className="flex items-center gap-3 px-5 py-3.5">
-                      <Icon
-                        name={c.ok ? "CircleCheck" : "CircleX"}
-                        size={18}
-                        className={c.ok ? "text-status-success shrink-0" : "text-status-danger shrink-0"}
-                      />
+                      <Icon name={c.ok ? "CircleCheck" : "CircleX"} size={18} className={c.ok ? "text-status-success shrink-0" : "text-status-danger shrink-0"} />
                       <span className="flex-1 text-sm font-medium text-text">{c.label}</span>
                       <span className={cn("text-sm font-semibold", c.ok ? "text-status-success" : "text-status-danger")}>
                         {c.ok ? "Valid" : "Needs attention"}
@@ -529,38 +707,28 @@ export default function CreateEventPage() {
                 </div>
               </div>
 
-              <AlertBanner
-                tone="warning"
-                title="Publishing makes this event visible to all attendees."
-                message="You can still edit details after publishing."
-              />
+              <AlertBanner tone="warning" title="Publishing makes this event visible to all attendees." message="You can still edit details after publishing." />
+
+              {createEvent.isError && (
+                <AlertBanner tone="danger" title="Could not publish event" message={createEvent.error?.message ?? "An error occurred. Please try again."} />
+              )}
 
               <div className="flex items-center justify-between pt-1">
-                <Button variant="ghost" onClick={() => setStep(2)} disabled={publishing} className="gap-2">
-                  <Icon name="ArrowLeft" size={16} />
-                  Back
+                <Button variant="ghost" onClick={() => setStep(2)} disabled={createEvent.isPending || savingDraft} className="gap-2">
+                  <Icon name="ArrowLeft" size={16} /> Back
                 </Button>
                 <div className="flex gap-3">
-                  <Button
-                    variant="ghost"
-                    onClick={() => router.push(ROUTES.ORGANIZER_EVENTS)}
-                    disabled={publishing}
-                  >
-                    Save as draft
+                  <Button variant="ghost" onClick={saveAsDraft} disabled={createEvent.isPending || savingDraft} className="gap-2">
+                    {savingDraft ? <><Icon name="Loader" size={15} className="animate-spin" /> Saving draft…</> : <><Icon name="Save" size={15} /> Save as draft</>}
                   </Button>
-                  <Button
-                    onClick={publish}
-                    disabled={!allValid || publishing}
-                    loading={publishing}
-                    className="gap-2"
-                  >
-                    {!publishing && <Icon name="Send" size={16} />}
-                    {publishing ? "Publishing…" : "Publish event"}
+                  <Button onClick={publish} disabled={!allValid || createEvent.isPending || savingDraft} className="gap-2">
+                    {createEvent.isPending ? <><Icon name="Loader" size={15} className="animate-spin" /> Publishing…</> : <><Icon name="Send" size={16} /> Publish event</>}
                   </Button>
                 </div>
               </div>
             </div>
           )}
+
         </div>
       </div>
     </div>

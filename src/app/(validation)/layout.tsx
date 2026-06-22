@@ -1,6 +1,7 @@
-'use client';
+"use client";
 
 import { useRouter, usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { Icon } from "@/components/Shared/Icon";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
@@ -16,21 +17,31 @@ interface NavItem {
 }
 
 const AGENT_NAV: NavItem[] = [
-  { id: "selector", label: "Events",  icon: "CalendarDays", route: ROUTES.AGENT      },
-  { id: "scanner",  label: "Scanner", icon: "ScanLine",     route: ROUTES.AGENT_SCAN },
-  { id: "cash",     label: "Cash",    icon: "Wallet",       route: ROUTES.AGENT_CASH },
+  {
+    id: "selector",
+    label: "Events",
+    icon: "CalendarDays",
+    route: ROUTES.AGENT,
+  },
+  {
+    id: "scanner",
+    label: "Scanner",
+    icon: "ScanLine",
+    route: ROUTES.AGENT_SCAN,
+  },
+  { id: "cash", label: "Cash", icon: "Wallet", route: ROUTES.AGENT_CASH },
 ];
 
 function getActiveTab(pathname: string): string {
-  if (pathname.startsWith("/agent/scanner"))    return "scanner";
+  if (pathname.startsWith("/agent/scanner")) return "scanner";
   if (pathname.startsWith("/agent/cash-entry")) return "cash";
   return "selector";
 }
 
 const PAGE_LABELS: Record<string, string> = {
   selector: "Select Event",
-  scanner:  "QR Scanner",
-  cash:     "Cash Entry",
+  scanner: "QR Scanner",
+  cash: "Cash Entry",
 };
 
 // ── Top bar ───────────────────────────────────────────────────────────────
@@ -57,7 +68,7 @@ function AgentTopBar({ label }: { label: string }) {
       {/* Sign out */}
       <button
         type="button"
-        onClick={() => router.push(ROUTES.LOGIN)}
+        onClick={() => signOut({ redirect: true, callbackUrl: "/login" })}
         aria-label="Sign out"
         className="flex items-center gap-1.5 text-red-400 hover:text-red-300 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 rounded px-1 py-1"
       >
@@ -70,11 +81,7 @@ function AgentTopBar({ label }: { label: string }) {
 
 // ── Bottom nav ────────────────────────────────────────────────────────────
 
-function AgentBottomNav({
-  active,
-}: {
-  active: string;
-}) {
+function AgentBottomNav({ active }: { active: string }) {
   const router = useRouter();
   return (
     <nav
@@ -91,7 +98,7 @@ function AgentBottomNav({
             aria-current={isActive ? "page" : undefined}
             aria-label={item.label}
             className={cn(
-              "flex flex-col items-center gap-[3px] py-2 px-1 text-[11px] font-semibold font-body rounded-sm transition-colors",
+              "flex flex-col items-center gap-0.75 py-2 px-1 text-[11px] font-semibold font-body rounded-sm transition-colors",
               isActive
                 ? "text-brand-orange"
                 : "text-white/40 hover:text-white/70",
@@ -113,22 +120,22 @@ export default function ValidationLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname  = usePathname();
+  const pathname = usePathname();
   const activeTab = getActiveTab(pathname);
   const pageLabel = PAGE_LABELS[activeTab] ?? "Scanner";
 
   return (
-    <div className="w-screen h-screen bg-brand-navy flex flex-col overflow-hidden">
-      {/* Shared top bar across all agent screens */}
-      <AgentTopBar label={pageLabel} />
+    <>
+      <div className="w-screen h-screen bg-brand-navy flex flex-col overflow-hidden">
+        {/* Shared top bar across all agent screens */}
+        <AgentTopBar label={pageLabel} />
 
-      {/* Page content fills remaining height */}
-      <div className="flex-1 overflow-hidden">
-        {children}
+        {/* Page content fills remaining height */}
+        <div className="flex-1 overflow-hidden">{children}</div>
+
+        {/* Shared bottom nav */}
+        <AgentBottomNav active={activeTab} />
       </div>
-
-      {/* Shared bottom nav */}
-      <AgentBottomNav active={activeTab} />
-    </div>
+    </>
   );
 }

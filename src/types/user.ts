@@ -18,17 +18,18 @@ export interface OrganizerType {
 }
 
 export interface GateAgentType {
-  id: number;
+  id: string | number;  // number in mock data; MongoDB ObjectId string from real API
   name: string;
   phone: string;        // "+211 922 481 003"
   event: string;        // Assigned event name
   gate: string;         // "Gate A"
   status: AgentStatus;
+  image: string | null; // Cloudinary URL or null
 }
 
 // Admin gate agent row — extends base with activity data
 export interface AdminAgentType {
-  id: number;
+  id: string | number;  // number in mock data; MongoDB ObjectId string from real API
   name: string;
   phone: string;
   event: string;

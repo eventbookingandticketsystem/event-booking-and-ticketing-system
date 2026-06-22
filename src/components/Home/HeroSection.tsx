@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { Icon } from "@/components/Shared/Icon";
 import { Button } from "@/components/Shared/Button";
@@ -14,23 +14,23 @@ interface HeroSectionProps {
 // Orange scan beam at y=qr*0.46, corner brackets at all 4 corners
 function HeroArt() {
   const mods = [
-    [1,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,1],
-    [1,0,0,0,0,0,1,0,1,1,0,1,0,0,0,0,1],
-    [1,0,1,1,1,0,1,0,0,1,1,1,0,1,1,0,1],
-    [1,0,1,1,1,0,1,0,1,0,0,1,0,1,1,0,1],
-    [1,0,1,1,1,0,1,0,1,1,1,0,0,1,1,0,1],
-    [1,0,0,0,0,0,1,0,0,1,0,1,0,0,0,0,1],
-    [1,1,1,1,1,1,1,0,1,0,1,0,1,1,1,1,1],
-    [0,0,0,0,0,0,0,0,1,1,0,1,0,0,0,0,0],
-    [1,0,1,1,0,1,1,1,0,1,1,0,1,0,1,1,0],
-    [0,1,1,0,1,0,0,1,1,0,0,1,0,1,1,0,1],
-    [1,0,0,1,1,1,1,0,1,1,1,0,1,0,0,1,0],
-    [0,1,1,0,0,1,0,1,0,0,1,1,0,1,1,0,1],
-    [1,1,1,1,1,1,1,0,1,1,0,1,1,0,1,0,0],
-    [1,0,0,0,0,0,1,0,0,1,1,0,0,1,0,1,1],
-    [1,0,1,1,1,0,1,0,1,0,1,1,1,0,1,0,1],
-    [1,0,1,1,1,0,1,0,0,1,0,0,1,1,0,1,0],
-    [1,1,1,1,1,1,1,0,1,0,1,1,0,1,1,0,1],
+    [1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1],
+    [1, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 1],
+    [1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 1, 0, 1],
+    [1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1],
+    [1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 1],
+    [1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1],
+    [1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1],
+    [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0],
+    [1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0],
+    [0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1],
+    [1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 0],
+    [0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1],
+    [1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 0],
+    [1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1],
+    [1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1],
+    [1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0],
+    [1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 1],
   ];
   const n = mods.length;
   const cell = 13;
@@ -57,8 +57,10 @@ function HeroArt() {
       <svg viewBox={`0 0 ${qr} ${qr}`} width="100%" height="100%">
         {/* Card background */}
         <rect
-          x="2" y="2"
-          width={qr - 4} height={qr - 4}
+          x="2"
+          y="2"
+          width={qr - 4}
+          height={qr - 4}
           rx="14"
           fill="#fff"
           stroke="#11314a"
@@ -77,8 +79,8 @@ function HeroArt() {
                 height={cell}
                 fill="#08283B"
               />
-            ) : null
-          )
+            ) : null,
+          ),
         )}
 
         {/* Scan beam glow (gradient above line) */}
@@ -123,16 +125,37 @@ function HeroArt() {
   );
 }
 
-export function HeroSection({ onSignIn, onRegister, onExplore }: HeroSectionProps) {
+export function HeroSection({
+  onSignIn,
+  onRegister,
+  onExplore,
+}: HeroSectionProps) {
   return (
     <section
-      className="text-white overflow-hidden"
+      className="text-white overflow-hidden relative"
       style={{
-        background:
-          "radial-gradient(1100px 520px at 78% -10%, #0d3047 0%, transparent 62%), #08283B",
+        backgroundImage:
+          "url('https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D')",
+        backgroundSize: "cover",
+        backgroundPosition: "center 40%",
       }}
     >
-      <div className="max-w-[1120px] mx-auto px-7 py-[72px] pb-[84px] grid grid-cols-1 md:grid-cols-[1.1fr_0.9fr] gap-12 items-center">
+      {/* Base dark layer — keeps the whole section readable */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: "rgba(8,40,59,0.72)" }}
+        aria-hidden="true"
+      />
+      {/* Directional overlay — left text column is near-opaque, right photo shows through */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "linear-gradient(to right, rgba(8,40,59,0.88) 0%, rgba(8,40,59,0.55) 45%, rgba(8,40,59,0.10) 100%)",
+        }}
+        aria-hidden="true"
+      />
+      <div className="relative z-10 max-w-[1120px] mx-auto px-7 py-[72px] pb-[84px] grid grid-cols-1 md:grid-cols-[1.1fr_0.9fr] gap-12 items-center">
         {/* Copy */}
         <div className="lp-hero-copy">
           <span className="text-[12px] font-semibold tracking-[1.2px] uppercase text-brand-orange">
@@ -145,7 +168,8 @@ export function HeroSection({ onSignIn, onRegister, onExplore }: HeroSectionProp
             Secure event ticketing for everyone
           </p>
           <p className="text-[17px] leading-relaxed text-white/72 max-w-[460px] mt-3.5">
-            QR-validated tickets. Mobile money payments. Works offline. Built for the modern world.
+            QR-validated tickets. Mobile money payments. Works offline. Built
+            for the modern world.
           </p>
           <div className="flex flex-wrap gap-3.5 mt-8">
             <Button

@@ -1,15 +1,17 @@
 'use client';
 
 import { useState } from "react";
+import apiClient from "@/lib/api/client";
 import { PhoneInput } from "@/components/Shared/PhoneInput";
 import { Button } from "@/components/Shared/Button";
+import { AlertBanner } from "@/components/Shared/AlertBanner";
 import { Icon } from "@/components/Shared/Icon";
 import { DEFAULT_PHONE, type PhoneValue } from "@/constants/countries";
 import { cn } from "@/lib/utils";
 
 interface RegisterFormProps {
   onSuccess: () => void;
-  onSignIn: () => void;
+  onSignIn:  () => void;
 }
 
 // Password strength: copied exactly from auth.jsx Register → pwScore logic
@@ -22,9 +24,9 @@ function calcPwScore(pw: string): 0 | 1 | 2 | 3 {
   return s as 0 | 1 | 2 | 3;
 }
 
-const PW_LABEL  = ["", "Weak",    "Fair",    "Strong"  ] as const;
-const PW_COLOR  = ["", "#A32D2D", "#7A4A00", "#1A6B3C" ] as const;
-const PW_BG     = ["", "bg-status-danger", "bg-status-warning", "bg-status-success"] as const;
+const PW_LABEL = ["", "Weak",    "Fair",    "Strong"  ] as const;
+const PW_COLOR = ["", "#A32D2D", "#7A4A00", "#1A6B3C" ] as const;
+const PW_BG    = ["", "bg-status-danger", "bg-status-warning", "bg-status-success"] as const;
 
 export function RegisterForm({ onSuccess, onSignIn }: RegisterFormProps) {
   const [name, setName]       = useState("");
@@ -35,6 +37,7 @@ export function RegisterForm({ onSuccess, onSignIn }: RegisterFormProps) {
   const [showPw, setShowPw]   = useState(false);
   const [loading, setLoading] = useState(false);
   const [touched, setTouched] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const pwScore = calcPwScore(pw);
 
@@ -63,15 +66,29 @@ export function RegisterForm({ onSuccess, onSignIn }: RegisterFormProps) {
   const isValid  = !Object.values(errors).some(Boolean);
   const fieldErr = (k: keyof typeof errors) => (touched ? errors[k] : "");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setTouched(true);
     if (!isValid) return;
+
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    setServerError(null);
+
+    try {
+      await apiClient.post("/auth/register", {
+        name:     name.trim(),
+        phone:    phone.dial + phone.num,
+        password: pw,
+        role:     role.toUpperCase(),   // "ATTENDEE" | "ORGANIZER"
+      });
+      // onSuccess navigates to /login?banner=registered
       onSuccess();
-    }, 1100);
+    } catch (err) {
+      setServerError(
+        err instanceof Error ? err.message : "Registration failed. Please try again.",
+      );
+      setLoading(false);
+    }
   };
 
   return (
@@ -90,6 +107,15 @@ export function RegisterForm({ onSuccess, onSignIn }: RegisterFormProps) {
         </p>
       </div>
 
+      {/* Server error (duplicate phone, etc.) */}
+      {serverError && (
+        <AlertBanner
+          tone="danger"
+          title="Registration failed"
+          message={serverError}
+        />
+      )}
+
       {/* Full name */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor="reg-name" className="text-sm font-semibold text-text font-body">
@@ -100,7 +126,7 @@ export function RegisterForm({ onSuccess, onSignIn }: RegisterFormProps) {
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Achol Deng"
+          placeholder="Your full name"
           disabled={loading}
           aria-label="Full name"
           aria-invalid={!!fieldErr("name")}
@@ -169,8 +195,14 @@ export function RegisterForm({ onSuccess, onSignIn }: RegisterFormProps) {
         {/* Strength meter — only shown when pw has content */}
         {pw && (
           <div className="-mt-1">
-            {/* 3-segment bar */}
-            <div className="flex gap-[5px] mt-2" role="meter" aria-label={`Password strength: ${PW_LABEL[pwScore]}`} aria-valuenow={pwScore} aria-valuemin={0} aria-valuemax={3}>
+            <div
+              className="flex gap-[5px] mt-2"
+              role="meter"
+              aria-label={`Password strength: ${PW_LABEL[pwScore]}`}
+              aria-valuenow={pwScore}
+              aria-valuemin={0}
+              aria-valuemax={3}
+            >
               {([1, 2, 3] as const).map((i) => (
                 <span
                   key={i}
@@ -181,11 +213,7 @@ export function RegisterForm({ onSuccess, onSignIn }: RegisterFormProps) {
                 />
               ))}
             </div>
-            {/* Strength label */}
-            <p
-              className="text-xs font-semibold mt-1.5"
-              style={{ color: PW_COLOR[pwScore] }}
-            >
+            <p className="text-xs font-semibold mt-1.5" style={{ color: PW_COLOR[pwScore] }}>
               {PW_LABEL[pwScore]} password
             </p>
           </div>
@@ -225,11 +253,7 @@ export function RegisterForm({ onSuccess, onSignIn }: RegisterFormProps) {
         <label className="text-sm font-semibold text-text font-body">
           I am registering as
         </label>
-        <div
-          className="flex gap-2"
-          role="radiogroup"
-          aria-label="Account role"
-        >
+        <div className="flex gap-2" role="radiogroup" aria-label="Account role">
           {(["attendee", "organizer"] as const).map((r) => (
             <button
               key={r}

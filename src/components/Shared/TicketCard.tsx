@@ -4,13 +4,16 @@ import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
 import { Icon } from "./Icon";
 import { StatusPill } from "./StatusPill";
-import type { TicketType } from "@/types/ticket";
+import type { TicketType, TicketEventSummary } from "@/types/ticket";
 import type { EventType } from "@/types/event";
 import { POSTERS } from "@/lib/mock-data";
 
+/** Accept either a full EventType or the lighter TicketEventSummary */
+type TicketEventProp = Pick<EventType, "title" | "date" | "venue" | "category"> | TicketEventSummary;
+
 interface TicketCardProps {
   ticket: TicketType;
-  event: EventType;
+  event: TicketEventProp;
   onClick?: () => void;
   className?: string;
 }

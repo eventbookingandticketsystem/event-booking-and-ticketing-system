@@ -52,7 +52,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
       aria-modal="true"
       aria-labelledby={title ? "modal-title" : undefined}
       aria-describedby={description ? "modal-description" : undefined}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
     >
       {/* Backdrop */}
       <div
@@ -60,11 +60,12 @@ export function Modal({ open, onClose, title, description, children, footer, siz
         onClick={onClose}
         aria-hidden="true"
       />
-      {/* Dialog */}
+      {/* Dialog — constrained to viewport height so body can scroll */}
       <div
         ref={dialogRef}
         className={cn(
-          "relative w-full bg-white rounded-lg shadow-pop overflow-hidden flex flex-col",
+          "relative w-full bg-white rounded-lg shadow-pop flex flex-col",
+          "max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-3rem)]",
           sizeClasses[size],
           className,
         )}
@@ -94,8 +95,8 @@ export function Modal({ open, onClose, title, description, children, footer, siz
             </button>
           </div>
         )}
-        {/* Body */}
-        <div className="px-6 py-5 overflow-y-auto flex-1">
+        {/* Body — scrolls when content exceeds available height */}
+        <div className="px-6 py-5 overflow-y-auto flex-1 min-h-0">
           {children}
         </div>
         {/* Footer */}

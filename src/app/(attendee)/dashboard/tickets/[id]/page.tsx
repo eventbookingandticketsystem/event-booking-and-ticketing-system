@@ -2,11 +2,10 @@
 
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
-import { notFound } from "next/navigation";
 import { StatusPill } from "@/components/Shared/StatusPill";
 import { AlertBanner } from "@/components/Shared/AlertBanner";
 import { Icon } from "@/components/Shared/Icon";
-import { MY_TICKETS, EVENT_BY_ID } from "@/lib/mock-data";
+import { useTicket } from "@/lib/api/hooks/useTicket";
 import { generateTicketQR } from "@/lib/qr-utils";
 
 interface PageProps {
@@ -17,21 +16,19 @@ export default function QRViewPage({ params }: PageProps) {
   const { id } = use(params);
   const router = useRouter();
 
-  const ticket = MY_TICKETS.find((t) => t.id === id);
-  if (!ticket) notFound();
-
-  const event = EVENT_BY_ID[ticket.eventId];
-  if (!event) notFound();
+  const { data: ticket, isLoading, isError, error } = useTicket(id);
 
   const [qrSrc, setQrSrc] = useState<string | null>(null);
   const [tipVisible, setTipVisible] = useState(true);
   const [toast, setToast] = useState(false);
 
+  // Generate QR when ticket data arrives
   useEffect(() => {
+    if (!ticket) return;
     generateTicketQR(ticket.id)
       .then((src) => setQrSrc(src))
       .catch(() => setQrSrc(null));
-  }, [ticket.id]);
+  }, [ticket?.id]);
 
   const handleShare = () => {
     if (typeof navigator !== "undefined") {
@@ -40,6 +37,58 @@ export default function QRViewPage({ params }: PageProps) {
     setToast(true);
     setTimeout(() => setToast(false), 1800);
   };
+
+  // ── Loading state ──────────────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <div className="flex flex-col">
+        <div className="flex md:hidden items-center gap-3 px-[18px] pt-4 pb-3 bg-surface border-b border-border shrink-0">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            aria-label="Go back"
+            className="w-9 h-9 rounded-full bg-surface-bg inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
+          >
+            <Icon name="ArrowLeft" size={18} />
+          </button>
+          <div className="skeleton h-5 w-32 rounded flex-1" />
+        </div>
+        <div className="w-full max-w-2xl mx-auto px-4 md:px-8 pt-6 flex flex-col items-center gap-4">
+          <div className="skeleton h-6 w-48 rounded" />
+          <div className="skeleton h-4 w-64 rounded" />
+          <div className="skeleton w-[276px] h-[276px] rounded-lg" />
+          <div className="skeleton h-4 w-40 rounded" />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Error / not found state ─────────────────────────────────────────────────
+  if (isError || !ticket) {
+    return (
+      <div className="flex flex-col">
+        <div className="flex md:hidden items-center gap-3 px-[18px] pt-4 pb-3 bg-surface border-b border-border shrink-0">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            aria-label="Go back"
+            className="w-9 h-9 rounded-full bg-surface-bg inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
+          >
+            <Icon name="ArrowLeft" size={18} />
+          </button>
+          <h1 className="font-display font-semibold text-[18px] text-text flex-1 m-0">Your ticket</h1>
+        </div>
+        <div className="w-full max-w-2xl mx-auto px-4 md:px-8 pt-6">
+          <AlertBanner
+            tone="danger"
+            message={(error as Error)?.message ?? "Ticket not found."}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const event = ticket.event;
 
   return (
     <div className="flex flex-col">
@@ -112,10 +161,10 @@ export default function QRViewPage({ params }: PageProps) {
           {/* QR view */}
           <div className="flex flex-col items-center text-center pt-4 pb-8">
             <h2 className="font-display font-bold text-[20px] text-text leading-snug mb-0.5">
-              {event.title}
+              {event?.title ?? ticket.id}
             </h2>
             <p className="text-[13px] text-text-secondary mb-5">
-              {event.date} · {event.venue}
+              {[event?.date, event?.venue].filter(Boolean).join(" · ")}
             </p>
 
             {/* QR code card */}

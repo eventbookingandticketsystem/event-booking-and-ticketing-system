@@ -2,12 +2,13 @@
 
 import { useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { notFound } from "next/navigation";
 import { TierSelector } from "@/components/Shared/TierSelector";
+import { SkeletonCard } from "@/components/Shared/SkeletonCard";
+import { AlertBanner } from "@/components/Shared/AlertBanner";
 import { Button } from "@/components/Shared/Button";
 import { Icon } from "@/components/Shared/Icon";
 import { formatSSP } from "@/lib/utils";
-import { EVENT_BY_ID } from "@/lib/mock-data";
+import { useEvent } from "@/lib/api/hooks/useEvent";
 import { ROUTES } from "@/constants/routes";
 import type { TicketTier } from "@/types/event";
 
@@ -19,15 +20,14 @@ export default function EventDetailPage({ params }: PageProps) {
   const { id } = use(params);
   const router = useRouter();
 
-  const ev = EVENT_BY_ID[id];
-  if (!ev) notFound();
+  const { data: ev, isLoading, isError, error } = useEvent(id);
 
   const [qty, setQty] = useState<Record<string, number>>({});
   const [aboutOpen, setAboutOpen] = useState(true);
 
   const handleQtyChange = (tierId: string, delta: number) => {
     setQty((prev) => {
-      const tier = ev.tiers.find((t) => t.id === tierId);
+      const tier = ev?.tiers.find((t: TicketTier) => t.id === tierId);
       if (!tier) return prev;
       const current = prev[tierId] ?? 0;
       const next = Math.max(0, Math.min(tier.remaining, current + delta));
@@ -35,10 +35,12 @@ export default function EventDetailPage({ params }: PageProps) {
     });
   };
 
-  const total = ev.tiers.reduce((s, t) => s + (qty[t.id] ?? 0) * t.price, 0);
+  const tiers = ev?.tiers ?? [];
+  const total = tiers.reduce((s, t) => s + (qty[t.id] ?? 0) * t.price, 0);
   const count = Object.values(qty).reduce((a, b) => a + b, 0);
 
   const handleBook = () => {
+    if (!ev) return;
     if (typeof window !== "undefined") {
       const lines = ev.tiers
         .filter((t) => (qty[t.id] ?? 0) > 0)
@@ -47,6 +49,49 @@ export default function EventDetailPage({ params }: PageProps) {
     }
     router.push(ROUTES.BOOKING(ev.id));
   };
+
+  // ── Loading state ───────────────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <div className="flex flex-col h-full">
+        {/* Poster skeleton */}
+        <div className="skeleton h-[240px] md:h-[300px] shrink-0" />
+        <div className="w-full max-w-3xl mx-auto px-4 md:px-8 pt-5 flex flex-col gap-4">
+          <div className="skeleton h-4 w-24 rounded" />
+          <div className="skeleton h-7 w-3/4 rounded" />
+          <div className="skeleton h-4 w-40 rounded" />
+          <div className="skeleton h-16 rounded" />
+          <div className="skeleton h-16 rounded" />
+          <div className="skeleton h-24 rounded" />
+          <div className="skeleton h-24 rounded" />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Error state ─────────────────────────────────────────────────────────────
+  if (isError || !ev) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center gap-3 px-[18px] pt-4 pb-3 bg-surface border-b border-border shrink-0">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            aria-label="Go back"
+            className="w-10 h-10 rounded-full bg-surface-bg text-brand-navy inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
+          >
+            <Icon name="ArrowLeft" size={19} />
+          </button>
+        </div>
+        <div className="w-full max-w-3xl mx-auto px-4 md:px-8 pt-6">
+          <AlertBanner
+            tone="danger"
+            message={(error as Error)?.message ?? "Event not found."}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">

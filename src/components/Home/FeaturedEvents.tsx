@@ -5,14 +5,15 @@ import { useRouter } from "next/navigation";
 import { ExploreCard } from "@/components/Shared/ExploreCard";
 import { Button } from "@/components/Shared/Button";
 import { Icon } from "@/components/Shared/Icon";
-import { EXPLORE_EVENTS } from "@/lib/mock-data";
 import { ROUTES } from "@/constants/routes";
 import { cn } from "@/lib/utils";
+import { useExploreEvents } from "@/lib/api/hooks/useExploreEvents";
 
 const CATEGORIES = [
   "All",
   "Music",
   "Sports",
+  "Concert",
   "Conference",
   "Church",
   "Graduation",
@@ -23,20 +24,35 @@ type Category = (typeof CATEGORIES)[number];
 
 const INITIAL_VISIBLE = 8;
 
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+function CardSkeleton() {
+  return (
+    <div
+      className="relative rounded-xl overflow-hidden aspect-3/4 w-full"
+      style={{ background: "#0e1c29" }}
+    >
+      <div className="absolute inset-0 skeleton" style={{ borderRadius: 12 }} />
+    </div>
+  );
+}
+
 export function FeaturedEvents() {
   const router = useRouter();
   const [activeCategory, setActiveCategory] = useState<Category>("All");
   const [showAll, setShowAll] = useState(false);
 
-  const filtered =
-    activeCategory === "All"
-      ? EXPLORE_EVENTS
-      : EXPLORE_EVENTS.filter((e) => e.category === activeCategory);
+  // Map UI category label → API category param (undefined = no filter)
+  const categoryParam =
+    activeCategory === "All" ? undefined : activeCategory;
 
-  const visible = showAll ? filtered : filtered.slice(0, INITIAL_VISIBLE);
-  const hasMore = filtered.length > INITIAL_VISIBLE && !showAll;
+  const { data: events = [], isLoading } = useExploreEvents({
+    category: categoryParam,
+    limit: 50,
+  });
 
-  // Reset "show all" when category changes
+  const visible = showAll ? events : events.slice(0, INITIAL_VISIBLE);
+  const hasMore = events.length > INITIAL_VISIBLE && !showAll;
+
   const handleCategory = (cat: Category) => {
     setActiveCategory(cat);
     setShowAll(false);
@@ -94,15 +110,20 @@ export function FeaturedEvents() {
           ))}
         </div>
 
-        {/* Event grid */}
-        {filtered.length === 0 ? (
+        {/* Loading skeletons */}
+        {isLoading && (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-sm:grid-cols-1">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <CardSkeleton key={i} />
+            ))}
+          </div>
+        )}
+
+        {/* Empty */}
+        {!isLoading && events.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <span className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-surface border border-border mb-4">
-              <Icon
-                name="CalendarSearch"
-                size={26}
-                className="text-text-muted"
-              />
+              <Icon name="CalendarSearch" size={26} className="text-text-muted" />
             </span>
             <p className="font-display font-semibold text-[17px] text-text mb-1">
               No events in this category
@@ -111,7 +132,10 @@ export function FeaturedEvents() {
               Try a different category or check back soon.
             </p>
           </div>
-        ) : (
+        )}
+
+        {/* Event grid */}
+        {!isLoading && events.length > 0 && (
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-sm:grid-cols-1">
               {visible.map((ev) => (
@@ -123,7 +147,6 @@ export function FeaturedEvents() {
               ))}
             </div>
 
-            {/* View more / Show less */}
             {hasMore && (
               <div className="flex justify-center mt-10">
                 <Button
@@ -131,18 +154,18 @@ export function FeaturedEvents() {
                   size="lg"
                   onClick={() => setShowAll(true)}
                   className="gap-2 min-w-[200px]"
-                  aria-label={`Show all ${filtered.length} events`}
+                  aria-label={`Show all ${events.length} events`}
                 >
                   <Icon name="ChevronDown" size={18} />
                   View more events
                   <span className="ml-1 inline-flex items-center justify-center h-5 px-1.5 rounded-full bg-brand-orange/10 text-brand-orange text-[11px] font-bold">
-                    +{filtered.length - INITIAL_VISIBLE}
+                    +{events.length - INITIAL_VISIBLE}
                   </span>
                 </Button>
               </div>
             )}
 
-            {showAll && filtered.length > INITIAL_VISIBLE && (
+            {showAll && events.length > INITIAL_VISIBLE && (
               <div className="flex justify-center mt-10">
                 <Button
                   variant="ghost"
