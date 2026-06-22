@@ -204,6 +204,7 @@ export interface ApiOrgDashboard {
 export interface ApiOrgEvent {
   id: string;
   title: string;
+  description: string | null;
   status: string;        // "DRAFT" | "PUBLISHED" | "ONGOING" | "COMPLETED" | "CANCELLED"
   date: string;          // ISO DateTime
   time: string;
@@ -211,7 +212,8 @@ export interface ApiOrgEvent {
   city: string;
   category: string;
   organizer: string;
-  poster: string | null;
+  poster: string | null; // CSS gradient string (rarely set in DB)
+  image: string | null;  // Cloudinary photo URL uploaded by organizer
   tiers: Array<{
     id: string;
     name: string;
@@ -242,6 +244,7 @@ export interface ApiCreatedEvent {
   category: string;
   organizer: string;
   poster: string | null;
+  image: string | null;
   tiers: Array<{
     id: string;
     name: string;
@@ -276,6 +279,11 @@ export interface ApiGateAgent {
     title: string;
     date: string;        // ISO DateTime
   };
+}
+
+/** Shape returned by POST /api/agents (includes one-time generated password) */
+export interface ApiCreatedAgent extends ApiGateAgent {
+  generatedPassword: string;
 }
 
 // ─── Current user / profile shapes ───────────────────────────────────────────
@@ -346,6 +354,69 @@ export interface ApiAdminUser {
     id:    string;
     badge: string | null;
   } | null;
+}
+
+// ─── My bookings (wallet) shapes ─────────────────────────────────────────────
+
+/** One booking row from GET /api/bookings/mine */
+export interface ApiMyBooking {
+  id:         string;
+  ref:        string;
+  status:     "PENDING" | "CONFIRMED" | "FAILED" | "EXPIRED" | "REFUNDED";
+  method:     string;          // "MTN" | "AIRTEL" | "CASH"
+  subtotal:   number;
+  serviceFee: number;
+  total:      number;
+  paidAt:     string | null;
+  createdAt:  string;
+  updatedAt:  string;
+  event: {
+    id:       string;
+    title:    string;
+    date:     string;          // ISO DateTime
+    venue:    string;
+    category: string;
+    poster:   string | null;
+    city:     string;
+  };
+  lines: Array<{
+    id:        string;
+    qty:       number;
+    unitPrice: number;
+    subtotal:  number;
+    tier: { id: string; name: string };
+  }>;
+  tickets: Array<{
+    id:        string;
+    ticketRef: string;
+    status:    string;
+    tier:      string;
+  }>;
+}
+
+// ─── Organizer reports shapes ─────────────────────────────────────────────────
+
+/** Shape returned by GET /api/organizer/reports */
+export interface ApiOrgReport {
+  eventName: string;
+  attended:  number;
+  revenue:   number;
+  fraud:     number;
+  duration:  string;            // e.g. "2h 15m" | "—"
+  entryRate: Array<{ t: string; v: number }>;
+  tiers: Array<{
+    name:      string;
+    capacity:  number;
+    sold:      number;
+    remaining: number;
+    soldOut:   boolean;
+  }>;
+  fraudRows: Array<{
+    time:      string;
+    gate:      string;
+    reason:    string;
+    ticketRef: string;
+  }>;
 }
 
 /** One event row from GET /api/admin/events — includes orgProfile nested */
