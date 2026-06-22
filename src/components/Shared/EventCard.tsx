@@ -5,7 +5,6 @@ import { formatSSP, formatDate } from "@/lib/utils";
 import { Icon } from "./Icon";
 import { StatusPill, type StatusValue } from "./StatusPill";
 import type { EventType } from "@/types/event";
-import { POSTERS } from "@/lib/mock-data";
 
 interface EventCardProps {
   event: EventType;
@@ -18,7 +17,9 @@ export function EventCard({ event, featured = false, onClick, className }: Event
   const lowestPrice = Math.min(...event.tiers.map((t) => t.price));
   const allSoldOut = event.tiers.every((t) => t.soldOut || t.remaining === 0);
   const anySellingFast = event.tiers.some((t) => t.lowStock);
-  const poster = POSTERS[event.category] ?? POSTERS["Conference"];
+  // `event.poster` is always the CSS gradient (set by adapter).
+  // `event.image` is the photo URL (Cloudinary or stock fallback — also set by adapter).
+  const poster = event.poster;
 
   const pillStatus: StatusValue = allSoldOut
     ? "Sold Out"

@@ -7,7 +7,6 @@ import { Icon } from "@/components/Shared/Icon";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
 import { type icons } from "lucide-react";
-import AuthProvider from "../auth/AuthProvider";
 import { useCurrentUser } from "@/lib/api/hooks/useCurrentUser";
 import { initials } from "@/components/Organizer/OrgTopbar";
 
@@ -191,7 +190,7 @@ export default function ManagementLayout({
   const pageLabel = NAV_LABELS[activeNav] ?? "Dashboard";
 
   return (
-    <AuthProvider>
+    <>
       {/* ── MOBILE (< lg) — top bar + scrollable content + fixed bottom nav ── */}
       <div className="flex lg:hidden flex-col min-h-screen bg-surface-bg">
         {/* Sticky top bar */}
@@ -219,6 +218,6 @@ export default function ManagementLayout({
           </main>
         </div>
       </div>
-    </AuthProvider>
+    </>
   );
 }

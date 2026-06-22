@@ -6,7 +6,6 @@ import { Icon } from "@/components/Shared/Icon";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
 import { type icons } from "lucide-react";
-import AuthProvider from "../auth/AuthProvider";
 
 // ── Nav config ────────────────────────────────────────────────────────────
 
@@ -99,7 +98,7 @@ function AgentBottomNav({ active }: { active: string }) {
             aria-current={isActive ? "page" : undefined}
             aria-label={item.label}
             className={cn(
-              "flex flex-col items-center gap-[3px] py-2 px-1 text-[11px] font-semibold font-body rounded-sm transition-colors",
+              "flex flex-col items-center gap-0.75 py-2 px-1 text-[11px] font-semibold font-body rounded-sm transition-colors",
               isActive
                 ? "text-brand-orange"
                 : "text-white/40 hover:text-white/70",
@@ -126,7 +125,7 @@ export default function ValidationLayout({
   const pageLabel = PAGE_LABELS[activeTab] ?? "Scanner";
 
   return (
-    <AuthProvider>
+    <>
       <div className="w-screen h-screen bg-brand-navy flex flex-col overflow-hidden">
         {/* Shared top bar across all agent screens */}
         <AgentTopBar label={pageLabel} />
@@ -137,6 +136,6 @@ export default function ValidationLayout({
         {/* Shared bottom nav */}
         <AgentBottomNav active={activeTab} />
       </div>
-    </AuthProvider>
+    </>
   );
 }

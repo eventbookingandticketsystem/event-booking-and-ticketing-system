@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Navbar } from "@/components/Home/Navbar";
 import { ExploreFilters } from "@/components/Home/ExploreFilters";
 import { ExploreCard } from "@/components/Shared/ExploreCard";
@@ -33,6 +34,7 @@ function ExploreCardSkeleton({ fixed = false }: { fixed?: boolean }) {
 
 export default function ExplorePage() {
   const router = useRouter();
+  const { data: session } = useSession();
 
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeTime,     setActiveTime]     = useState("");
@@ -80,6 +82,7 @@ export default function ExplorePage() {
         onRegister={handleRegister}
         onExplore={handleExplore}
         exploreActive
+        session={session}
       />
 
       <ExploreFilters

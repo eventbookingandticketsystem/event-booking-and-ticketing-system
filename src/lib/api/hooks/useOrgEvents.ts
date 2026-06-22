@@ -3,7 +3,7 @@ import apiClient from "../client";
 import type { ApiResponse, ApiOrgEvent } from "../types";
 import type { OrgEventRow } from "@/types/event";
 import { formatDate } from "@/lib/utils";
-import { POSTERS } from "@/lib/mock-data";
+import { categoryGradient } from "@/lib/category-gradient";
 
 /**
  * Map the API DB status strings → the UI OrgEventRow status.
@@ -28,8 +28,7 @@ export function adaptOrgEvent(e: ApiOrgEvent): OrgEventRow {
   const sold     = e.tiers.reduce((sum, t) => sum + (t.capacity - t.remaining), 0);
   const capacity = e.tiers.reduce((sum, t) => sum + t.capacity, 0);
   // Gradient poster by category — fallback when no Cloudinary image uploaded
-  const posterKey = e.category.toLowerCase() as keyof typeof POSTERS;
-  const poster    = POSTERS[posterKey] ?? POSTERS.concert;
+  const poster = categoryGradient(e.category);
 
   return {
     id:       e.id,
@@ -40,7 +39,7 @@ export function adaptOrgEvent(e: ApiOrgEvent): OrgEventRow {
     capacity,
     status:   adaptStatus(e.status),
     category: e.category,
-    image:    e.poster,   // Cloudinary URL (null if not uploaded)
+    image:    e.image,   // Cloudinary URL (null if not uploaded)
     poster,               // gradient CSS string (always present)
   };
 }

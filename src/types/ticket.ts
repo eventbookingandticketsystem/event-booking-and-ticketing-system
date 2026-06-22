@@ -8,10 +8,11 @@ export type TicketWhen   = "upcoming" | "past";
 export interface TicketEventSummary {
   id: string;
   title: string;
-  date: string;       // ISO string from DB — formatted by adapter before storing
+  date: string;         // formatted for display — adapter converts ISO → "10 Dec 2026"
   venue: string;
   category: string;
-  poster: string | null;
+  poster: string | null;  // CSS gradient string (always set by adapter)
+  image?: string;         // Cloudinary photo URL (optional)
 }
 
 export interface TicketType {

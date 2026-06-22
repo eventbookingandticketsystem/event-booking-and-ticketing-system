@@ -9,7 +9,8 @@ import { ROUTES } from "@/constants/routes";
 function LoginInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const bannerParam = searchParams.get("banner");
+  const bannerParam   = searchParams.get("banner");
+  const callbackUrl   = searchParams.get("callbackUrl");
 
   // Pre-set informational banners from URL params
   let banner: { tone: "success" | "info"; message: string } | null = null;
@@ -25,6 +26,7 @@ function LoginInner() {
         onRegister={() => router.push(ROUTES.REGISTER)}
         onForgot={() => router.push(ROUTES.FORGOT_PASSWORD)}
         banner={banner}
+        callbackUrl={callbackUrl}
       />
     </AuthLayout>
   );

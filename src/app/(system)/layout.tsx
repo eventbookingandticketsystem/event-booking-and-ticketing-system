@@ -9,7 +9,6 @@ import { Icon } from "@/components/Shared/Icon";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
 import { type icons } from "lucide-react";
-import AuthProvider from "../auth/AuthProvider";
 
 // ── Nav config ────────────────────────────────────────────────────────────
 
@@ -127,7 +126,7 @@ export default function SystemLayout({
   const crumb = NAV_LABELS[nav] ?? "Overview";
 
   return (
-    <AuthProvider>
+    <>
       {/* ── MOBILE (< lg) — sticky top bar + scrollable content + fixed bottom nav ── */}
       <div className="flex lg:hidden flex-col min-h-screen bg-surface-bg">
         {/* Sticky top bar */}
@@ -152,6 +151,6 @@ export default function SystemLayout({
           <main className="flex-1 overflow-y-auto">{children}</main>
         </div>
       </div>
-    </AuthProvider>
+    </>
   );
 }

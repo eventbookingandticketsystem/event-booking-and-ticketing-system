@@ -43,10 +43,15 @@ export async function GET(req: NextRequest) {
     const limit     = Math.min(50, Math.max(1, Number(searchParams.get("limit") ?? 12)));
     const skip      = (page - 1) * limit;
 
+    // Public-facing events must never include DRAFT or CANCELLED.
+    // When no status param is given, exclude both. When a specific status is
+    // requested, honour it (used by organizer/admin views via this shared route).
+    const statusWhere: Prisma.EventWhereInput["status"] = statusParam
+      ? (statusParam as Prisma.EnumEventStatusFilter)
+      : { notIn: ["DRAFT", "CANCELLED"] };
+
     const where: Prisma.EventWhereInput = {
-      status: statusParam
-        ? (statusParam as Prisma.EnumEventStatusFilter)
-        : { not: "CANCELLED" },
+      status: statusWhere,
       ...(category  && { category }),
       ...(featured  && { featured }),
       ...(city      && { city }),

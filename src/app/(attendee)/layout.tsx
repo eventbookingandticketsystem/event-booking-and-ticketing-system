@@ -1,13 +1,12 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { Icon } from "@/components/Shared/Icon";
 import { BottomNav, type AttendeeTab } from "@/components/Attendee/BottomNav";
 import { ROUTES } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 import { type icons } from "lucide-react";
-import AuthProvider from "../auth/AuthProvider";
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -138,6 +137,15 @@ const TAB_LABELS: Record<AttendeeTab, string> = {
 };
 
 function AttendeeTopbar({ active }: { active: AttendeeTab }) {
+  const router = useRouter();
+  const { data: session } = useSession();
+  const user      = session?.user as Record<string, unknown> | undefined;
+  const name      = (user?.name  as string | null | undefined) ?? "";
+  const image     = (user?.image as string | null | undefined) ?? null;
+  const initials  = name
+    ? name.split(" ").map((w: string) => w[0] ?? "").join("").slice(0, 2).toUpperCase()
+    : "?";
+
   return (
     <header className="flex items-center justify-between px-6 h-14 border-b border-border bg-surface shrink-0">
       <span className="font-display font-semibold text-[17px] text-text">
@@ -151,12 +159,22 @@ function AttendeeTopbar({ active }: { active: AttendeeTab }) {
         >
           <Icon name="Bell" size={18} />
         </button>
-        <div
-          className="w-8 h-8 rounded-full bg-brand-navy inline-flex items-center justify-center text-[13px] font-bold text-white font-body shrink-0"
-          aria-label="Attendee profile"
+        {/* Avatar — photo if set, initials otherwise */}
+        <button
+          type="button"
+          onClick={() => router.push(ROUTES.ACCOUNT)}
+          aria-label="Go to account settings"
+          className="w-8 h-8 rounded-full overflow-hidden shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
         >
-          AD
-        </div>
+          {image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={image} alt={name || "Profile"} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-brand-navy inline-flex items-center justify-center text-[13px] font-bold text-white font-body">
+              {initials}
+            </div>
+          )}
+        </button>
       </div>
     </header>
   );
@@ -178,7 +196,7 @@ export default function AttendeeLayout({
   };
 
   return (
-    <AuthProvider>
+    <>
       {/* ── MOBILE (< 768px) — unchanged narrow phone shell ── */}
       <div className="flex md:hidden min-h-screen bg-surface-bg flex-col items-center">
         <div className="w-full max-w-[390px] flex flex-col min-h-screen bg-surface-bg relative">
@@ -201,6 +219,6 @@ export default function AttendeeLayout({
           <main className="flex-1 overflow-y-auto">{children}</main>
         </div>
       </div>
-    </AuthProvider>
+    </>
   );
 }

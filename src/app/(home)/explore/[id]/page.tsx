@@ -2,12 +2,12 @@
 
 import { useState, use } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Navbar } from "@/components/Home/Navbar";
 import { Button } from "@/components/Shared/Button";
 import { Icon } from "@/components/Shared/Icon";
 import { AlertBanner } from "@/components/Shared/AlertBanner";
-import { cn } from "@/lib/utils";
-import { formatSSP } from "@/lib/utils";
+import { cn, formatSSP } from "@/lib/utils";
 import { EXPLORE_POSTERS } from "@/lib/mock-data";
 import { ROUTES } from "@/constants/routes";
 import { useExploreEvent } from "@/lib/api/hooks/useExploreEvents";
@@ -18,7 +18,8 @@ interface PageProps {
 
 export default function PublicEventPreviewPage({ params }: PageProps) {
   const { id } = use(params);
-  const router = useRouter();
+  const router  = useRouter();
+  const { data: session } = useSession();
 
   const { data: ev, isLoading, isError, error } = useExploreEvent(id);
 
@@ -37,9 +38,25 @@ export default function PublicEventPreviewPage({ params }: PageProps) {
     setTimeout(() => setToast(false), 1800);
   };
 
-  const handleBack     = () => router.back();
-  const handleBook     = (eventId: string) =>
-    router.push(`${ROUTES.LOGIN}?banner=booking&event=${eventId}`);
+  const handleBack = () => router.back();
+
+  /**
+   * Book a ticket:
+   * - Logged in → go straight to booking summary
+   * - Logged out → go to login, with callbackUrl pointing at the booking page
+   *   so the user lands there after signing in
+   */
+  const handleBook = (eventId: string) => {
+    if (session?.user) {
+      // Already authenticated — go directly to the booking page
+      router.push(ROUTES.BOOKING(eventId));
+    } else {
+      // Not authenticated — send to login, preserve destination
+      const callbackUrl = ROUTES.BOOKING(eventId);
+      router.push(`${ROUTES.LOGIN}?banner=booking&callbackUrl=${encodeURIComponent(callbackUrl)}`);
+    }
+  };
+
   const handleSignIn   = () => router.push(ROUTES.LOGIN);
   const handleRegister = () => router.push(ROUTES.REGISTER);
   const handleExplore  = () => router.push(ROUTES.EXPLORE);
@@ -51,6 +68,7 @@ export default function PublicEventPreviewPage({ params }: PageProps) {
         onRegister={handleRegister}
         onExplore={handleExplore}
         exploreActive
+        session={session}
       />
 
       {/* ── Loading ── */}
@@ -294,10 +312,13 @@ export default function PublicEventPreviewPage({ params }: PageProps) {
                   ))
                 )}
 
-                <p className="flex items-center gap-[7px] text-xs text-white/30 mt-4">
-                  <Icon name="Info" size={13} />
-                  Sign in to complete your booking.
-                </p>
+                {/* Footer hint — only shown when not logged in */}
+                {!session?.user && (
+                  <p className="flex items-center gap-[7px] text-xs text-white/30 mt-4">
+                    <Icon name="Info" size={13} />
+                    Sign in to complete your booking.
+                  </p>
+                )}
               </div>
             </aside>
           </div>

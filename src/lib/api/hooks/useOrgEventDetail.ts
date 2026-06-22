@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import apiClient from "../client";
 import type { ApiResponse, ApiOrgEvent } from "../types";
 import { formatDate } from "@/lib/utils";
-import { POSTERS } from "@/lib/mock-data";
+import { categoryGradient } from "@/lib/category-gradient";
 import type { TicketTier } from "@/types/event";
 
 /**
@@ -41,11 +41,9 @@ function adaptStatus(s: string): string {
   }
 }
 
-/** Pick a gradient poster by category, falling back to the first defined poster. */
-function posterForCategory(category: string, apiPoster: string | null): string {
-  if (apiPoster) return apiPoster;
-  const key = category.toLowerCase() as keyof typeof POSTERS;
-  return POSTERS[key] ?? POSTERS.concert;
+/** Pick a gradient poster by category — always returns a valid CSS gradient string. */
+function posterForCategory(category: string): string {
+  return categoryGradient(category);
 }
 
 export function adaptOrgEventDetail(e: ApiOrgEvent): OrgEventDetail {
@@ -67,9 +65,9 @@ export function adaptOrgEventDetail(e: ApiOrgEvent): OrgEventDetail {
     city:        e.city,
     category:    e.category,
     organizer:   e.organizer,
-    poster:      posterForCategory(e.category, null),  // gradient fallback
-    image:       e.poster,                             // Cloudinary URL (or null)
-    description: "",    // ApiOrgEvent doesn't include description — shown as empty
+    poster:      posterForCategory(e.category),  // gradient fallback
+    image:       e.image,   // Cloudinary URL (null if not uploaded)
+    description: e.description ?? "",
     sold,
     capacity,
     tiers: e.tiers.map((t) => ({

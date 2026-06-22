@@ -1,5 +1,6 @@
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import type { NextAuthOptions } from "next-auth";
 import prisma from "../../../../prisma/client";
@@ -11,24 +12,48 @@ export const authOptions: NextAuthOptions = {
     signIn: "/login",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       if (user) {
         token.id    = user.id;
-        token.role  = (user as unknown as Record<string, unknown>).role  ?? "ATTENDEE";
         token.phone = (user as unknown as Record<string, unknown>).phone ?? null;
+
+        // For OAuth sign-ins (Google), look up or default role from DB
+        if (account?.provider === "google") {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { role: true },
+          });
+          token.role = dbUser?.role ?? "ATTENDEE";
+        } else {
+          token.role = (user as unknown as Record<string, unknown>).role ?? "ATTENDEE";
+        }
       }
       return token;
     },
     async session({ session, token }) {
-      if (token && session.user) {
-        (session.user as Record<string, unknown>).id    = token.id;
-        (session.user as Record<string, unknown>).role  = token.role;
-        (session.user as Record<string, unknown>).phone = token.phone;
+      if (token?.id && session.user) {
+        // Always pull fresh name/image/phone from DB so profile edits
+        // reflect immediately without requiring a sign-out/sign-in cycle.
+        const fresh = await prisma.user.findUnique({
+          where:  { id: token.id as string },
+          select: { name: true, image: true, phone: true, role: true },
+        });
+
+        const u = session.user as Record<string, unknown>;
+        u.id    = token.id;
+        u.role  = fresh?.role  ?? token.role;
+        u.name  = fresh?.name  ?? session.user.name;
+        u.image = fresh?.image ?? session.user.image;
+        u.phone = fresh?.phone ?? token.phone;
       }
       return session;
     },
   },
   providers: [
+    GoogleProvider({
+      clientId:     process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
     CredentialsProvider({
       name: "credentials",
       credentials: {

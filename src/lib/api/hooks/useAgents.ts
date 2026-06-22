@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../client";
-import type { ApiResponse, ApiGateAgent } from "../types";
+import type { ApiResponse, ApiGateAgent, ApiCreatedAgent } from "../types";
 import type { GateAgentType } from "@/types/user";
 
 // ── Adapter ───────────────────────────────────────────────────────────────────
@@ -65,14 +65,15 @@ export function useAgents(params: UseAgentsParams = {}) {
 
 /**
  * POST /api/agents — create a gate agent (ORGANIZER only).
+ * Returns the created agent plus a one-time `generatedPassword`.
  * On success: invalidates ["agents"] so the table refreshes.
  */
 export function useCreateAgent() {
   const queryClient = useQueryClient();
 
-  return useMutation<ApiGateAgent, Error, CreateAgentInput>({
+  return useMutation<ApiCreatedAgent, Error, CreateAgentInput>({
     mutationFn: async (input) => {
-      const res = await apiClient.post<ApiResponse<ApiGateAgent>>("/agents", input);
+      const res = await apiClient.post<ApiResponse<ApiCreatedAgent>>("/agents", input);
       return res.data.data;
     },
     onSuccess: () => {

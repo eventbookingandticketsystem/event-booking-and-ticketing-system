@@ -15,19 +15,24 @@ export function formatUSD(n: number): string {
 // Alias kept for backward compatibility — prefer formatUSD
 export const formatSSP = formatUSD;
 
-// Format a date string for display
-// Passes through already-formatted strings (e.g. "Sat, 14 Dec 2025")
-// Converts ISO date strings (e.g. "2025-12-14") to "14 Dec 2025"
+// Format a date string for display.
+// Handles ISO datetime strings ("2026-12-10T17:00:00.000Z"),
+// plain date strings ("2026-12-10"), and already-formatted strings
+// ("10 Dec 2026" / "Sat, 14 Dec 2025").
 export function formatDate(d: string): string {
   if (!d) return "";
-  // If it already looks like a human date, return as-is
-  if (/[a-zA-Z]/.test(d) && d.length > 5) return d;
-  // Try to parse ISO date
-  const parsed = new Date(d);
-  if (isNaN(parsed.getTime())) return d;
-  return parsed.toLocaleDateString("en-GB", {
-    day:   "numeric",
-    month: "short",
-    year:  "numeric",
-  });
+  // If it looks like an ISO date or datetime (starts with 4 digits + dash), parse it.
+  // This covers "2026-12-10" and "2026-12-10T17:00:00.000Z".
+  if (/^\d{4}-\d{2}-\d{2}/.test(d)) {
+    const parsed = new Date(d);
+    if (!isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString("en-GB", {
+        day:   "numeric",
+        month: "short",
+        year:  "numeric",
+      });
+    }
+  }
+  // Any other value (already human-readable) — return as-is.
+  return d;
 }

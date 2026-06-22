@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import bcrypt from "bcryptjs";
 import prisma from "../../../../prisma/client";
 import {
   ok,
@@ -13,14 +14,42 @@ import {
 import { createAgentSchema } from "@/lib/validation/agent.schemas";
 import { Prisma } from "@prisma/client";
 
-// ── GET /api/agents — ORGANIZER or ADMIN ──────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Generate a readable 8-char password: 4 letters + 4 digits */
+function generatePassword(): string {
+  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz";
+  const digits  = "23456789";
+  let pw = "";
+  for (let i = 0; i < 4; i++) pw += letters[Math.floor(Math.random() * letters.length)];
+  for (let i = 0; i < 4; i++) pw += digits[Math.floor(Math.random() * digits.length)];
+  // Shuffle
+  return pw.split("").sort(() => Math.random() - 0.5).join("");
+}
+
+// ── GET /api/agents ───────────────────────────────────────────────────────────
+// ORGANIZER or ADMIN: list agents they manage.
+// GATE_AGENT: returns their own assignment(s) only.
 export async function GET(req: NextRequest) {
   try {
     const token = await getToken({ req });
     if (!token?.id) return forbidden("Authentication required");
 
+    // ── Gate agent fetching their own events ──────────────────────────────────
+    if (token.role === "GATE_AGENT") {
+      const agents = await prisma.gateAgent.findMany({
+        where:   { userId: token.id as string },
+        orderBy: { createdAt: "desc" },
+        include: {
+          event: { select: { id: true, title: true, date: true } },
+        },
+      });
+      return ok(agents);
+    }
+
+    // ── Organizer / Admin ─────────────────────────────────────────────────────
     if (token.role !== "ORGANIZER" && token.role !== "ADMIN") {
-      return forbidden("Organizer or Admin access required");
+      return forbidden("Access denied");
     }
 
     const { searchParams } = req.nextUrl;
@@ -30,14 +59,12 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(50, Math.max(1, Number(searchParams.get("limit") ?? 20)));
     const skip  = (page - 1) * limit;
 
-    // Role-based ownership filter
     let ownerFilter: Prisma.GateAgentWhereInput = {};
     if (token.role === "ORGANIZER") {
       ownerFilter = {
         event: { orgProfile: { userId: token.id as string } },
       };
     }
-    // ADMIN: no extra filter
 
     const where: Prisma.GateAgentWhereInput = {
       ...ownerFilter,
@@ -52,9 +79,7 @@ export async function GET(req: NextRequest) {
         take:    limit,
         orderBy: { createdAt: "desc" },
         include: {
-          event: {
-            select: { id: true, title: true, date: true },
-          },
+          event: { select: { id: true, title: true, date: true } },
         },
       }),
       prisma.gateAgent.count({ where }),
@@ -66,7 +91,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ── POST /api/agents — ORGANIZER only ─────────────────────────────────────
+// ── POST /api/agents ──────────────────────────────────────────────────────────
+// ORGANIZER only — creates a GateAgent record AND a User account the agent
+// can use to log in. Returns the plain-text password once (not stored).
 export async function POST(req: NextRequest) {
   try {
     const token = await getToken({ req });
@@ -92,26 +119,71 @@ export async function POST(req: NextRequest) {
     });
     if (!orgProfile) return forbidden("Organizer profile not found");
 
-    // 2. Find the event
-    const event = await prisma.event.findUnique({
-      where: { id: eventId },
-    });
+    // 2. Find the event and verify ownership
+    const event = await prisma.event.findUnique({ where: { id: eventId } });
     if (!event) return notFound("Event not found");
+    if (event.orgProfileId !== orgProfile.id) return forbidden("You do not own this event");
 
-    // 3. Verify ownership
-    if (event.orgProfileId !== orgProfile.id) {
-      return forbidden("You do not own this event");
+    // 3. Check if a User already exists for this phone number
+    const existingUser = await prisma.user.findFirst({ where: { phone } });
+
+    // 4. Generate credentials
+    const plainPassword = generatePassword();
+    const hashedPassword = await bcrypt.hash(plainPassword, 10);
+
+    let userId: string;
+
+    if (existingUser) {
+      // Re-use the existing user — update role to GATE_AGENT if needed
+      await prisma.user.update({
+        where: { id: existingUser.id },
+        data:  {
+          role:     "GATE_AGENT",
+          name:     name,
+          password: hashedPassword,           // reset password so organizer can share it
+        },
+      });
+      userId = existingUser.id;
+    } else {
+      // 5a. Create a new User account for the agent
+      const user = await prisma.user.create({
+        data: {
+          name,
+          phone,
+          password: hashedPassword,
+          role:     "GATE_AGENT",
+          agentProfile: {
+            create: {
+              phone,
+              assignedGate: gate,
+              status:       "ACTIVE",
+            },
+          },
+        },
+      });
+      userId = user.id;
     }
 
-    // 4. Create the gate agent
+    // 5b. Create AgentProfile if it doesn't exist yet
+    const existingProfile = await prisma.agentProfile.findUnique({
+      where: { userId },
+    });
+    if (!existingProfile) {
+      await prisma.agentProfile.create({
+        data: { userId, phone, assignedGate: gate, status: "ACTIVE" },
+      });
+    }
+
+    // 6. Create the GateAgent record, linked to the user
     const agent = await prisma.gateAgent.create({
-      data: { name, phone, gate, eventId, status: "ACTIVE" },
+      data: { name, phone, gate, eventId, userId, status: "ACTIVE" },
       include: {
         event: { select: { id: true, title: true, date: true } },
       },
     });
 
-    return created(agent);
+    // 7. Return agent + the plain-text password (once only)
+    return created({ ...agent, generatedPassword: plainPassword });
   } catch (e) {
     return serverError(e);
   }

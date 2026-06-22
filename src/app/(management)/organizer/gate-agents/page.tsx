@@ -17,11 +17,15 @@ import { useUpdateAgent, useDeleteAgent } from "@/lib/api/hooks/useUpdateAgent";
 import { useOrgEvents } from "@/lib/api/hooks/useOrgEvents";
 import { initials } from "@/components/Organizer/OrgTopbar";
 import type { GateAgentType } from "@/types/user";
+import type { ApiCreatedAgent } from "@/lib/api/types";
 
 export default function OrgAgentsPage() {
   const [addModal,      setAddModal]      = useState(false);
   const [deleteTarget,  setDeleteTarget]  = useState<GateAgentType | null>(null);
   const [toggleTarget,  setToggleTarget]  = useState<GateAgentType | null>(null);
+  // Credentials modal shown after successful agent creation
+  const [createdAgent,  setCreatedAgent]  = useState<ApiCreatedAgent | null>(null);
+  const [pwCopied,      setPwCopied]      = useState(false);
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const { data: agents = [], isLoading, isError, error } = useAgents();
@@ -44,12 +48,14 @@ export default function OrgAgentsPage() {
     setFormTouched(true);
     if (!agentName.trim() || !agentEventId) return;
     try {
-      await createAgent.mutateAsync({
+      const result = await createAgent.mutateAsync({
         name:    agentName.trim(),
         phone:   `${agentPhone.dial}${agentPhone.num}`,
         gate:    agentGate.trim() || "Gate A",
         eventId: agentEventId,
       });
+      // Show credentials modal
+      setCreatedAgent(result);
       handleAddClose();
     } catch {
       // Error shown via createAgent.isError
@@ -64,6 +70,13 @@ export default function OrgAgentsPage() {
     setAgentEventId("");
     setAgentGate("");
     createAgent.reset();
+  };
+
+  const handleCopyPassword = () => {
+    if (!createdAgent) return;
+    navigator.clipboard.writeText(createdAgent.generatedPassword).catch(() => {});
+    setPwCopied(true);
+    setTimeout(() => setPwCopied(false), 2000);
   };
 
   const confirmDelete = async () => {
@@ -167,6 +180,7 @@ export default function OrgAgentsPage() {
                 <tbody>
                   {agents.map((a) => (
                     <tr key={String(a.id)} className="border-b border-border/50 last:border-b-0 hover:bg-surface-bg/50">
+                      {/* Name with avatar */}
                       <td className="px-5 py-4 font-semibold">
                         <div className="flex items-center gap-2.5">
                           {a.image ? (
@@ -195,7 +209,7 @@ export default function OrgAgentsPage() {
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center justify-end gap-2">
-                          {/* Toggle status (Activate / Deactivate) */}
+                          {/* Toggle status */}
                           <button
                             type="button"
                             onClick={() => setToggleTarget(a)}
@@ -236,12 +250,14 @@ export default function OrgAgentsPage() {
         ) : null}
       </div>
 
-      {/* ── Add Agent Modal ── */}
+      {/* ══════════════════════════════════════════════════════════
+          ADD AGENT MODAL
+      ══════════════════════════════════════════════════════════ */}
       {addModal && (
         <Modal
           open={addModal}
           title="Add gate agent"
-          description="They'll receive a scanner login by SMS."
+          description="A login will be created for them automatically."
           onClose={handleAddClose}
           footer={
             <>
@@ -362,7 +378,84 @@ export default function OrgAgentsPage() {
         </Modal>
       )}
 
-      {/* ── Toggle Status Confirm Modal ── */}
+      {/* ══════════════════════════════════════════════════════════
+          CREDENTIALS MODAL — shown once after agent is created
+      ══════════════════════════════════════════════════════════ */}
+      {createdAgent && (
+        <Modal
+          open
+          title="Agent account created"
+          description="Share these login details with the gate agent. The password cannot be shown again."
+          onClose={() => setCreatedAgent(null)}
+          footer={
+            <Button onClick={() => setCreatedAgent(null)} className="gap-2">
+              <Icon name="Check" size={15} />
+              Done
+            </Button>
+          }
+        >
+          <div className="flex flex-col gap-4 py-2">
+            {/* Info banner */}
+            <AlertBanner
+              tone="info"
+              message="The agent signs in at /login with their phone number and the password below."
+            />
+
+            {/* Agent summary */}
+            <div className="flex items-center gap-3 px-4 py-3 bg-surface-bg rounded-md border border-border">
+              <div className="w-10 h-10 rounded-full bg-brand-navy/10 text-brand-navy flex items-center justify-center text-sm font-bold shrink-0 select-none">
+                {initials(createdAgent.name)}
+              </div>
+              <div className="min-w-0">
+                <div className="font-semibold text-text">{createdAgent.name}</div>
+                <div className="text-xs text-text-secondary font-mono">{createdAgent.phone}</div>
+              </div>
+              <div className="ml-auto text-right">
+                <div className="text-xs text-text-muted">Gate</div>
+                <div className="font-semibold text-text text-sm">{createdAgent.gate}</div>
+              </div>
+            </div>
+
+            {/* Credentials */}
+            <div className="flex flex-col gap-3">
+              {/* Phone (login) */}
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Login phone</span>
+                <div className="flex items-center gap-2 px-3.5 h-11 bg-surface-bg border border-border rounded-sm">
+                  <span className="flex-1 font-mono text-[15px] text-text">{createdAgent.phone}</span>
+                </div>
+              </div>
+
+              {/* Password */}
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Password (one time)</span>
+                <div className="flex items-center gap-2 px-3.5 h-11 bg-status-warning-bg border border-status-warning/30 rounded-sm">
+                  <span className="flex-1 font-mono text-[17px] font-bold tracking-widest text-text">{createdAgent.generatedPassword}</span>
+                  <button
+                    type="button"
+                    onClick={handleCopyPassword}
+                    aria-label="Copy password"
+                    className="shrink-0 text-text-secondary hover:text-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange rounded"
+                  >
+                    {pwCopied
+                      ? <Icon name="Check" size={16} className="text-status-success" />
+                      : <Icon name="Copy" size={16} />
+                    }
+                  </button>
+                </div>
+                <p className="text-[11px] text-status-warning font-semibold flex items-center gap-1">
+                  <Icon name="TriangleAlert" size={12} />
+                  This password will not be shown again. Copy it now.
+                </p>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════
+          TOGGLE STATUS CONFIRM MODAL
+      ══════════════════════════════════════════════════════════ */}
       {toggleTarget && (
         <Modal
           open
@@ -418,7 +511,9 @@ export default function OrgAgentsPage() {
         </Modal>
       )}
 
-      {/* ── Delete Confirm Modal ── */}
+      {/* ══════════════════════════════════════════════════════════
+          DELETE CONFIRM MODAL
+      ══════════════════════════════════════════════════════════ */}
       {deleteTarget && (
         <Modal
           open
