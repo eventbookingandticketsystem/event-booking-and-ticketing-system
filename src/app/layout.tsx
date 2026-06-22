@@ -3,6 +3,11 @@ import "./globals.css";
 import { QueryProvider } from "@/lib/api/QueryProvider";
 import AuthProvider from "@/app/auth/AuthProvider";
 
+// Force all routes under the root layout to be dynamic so Next.js never
+// attempts to statically prerender /_not-found or /_global-error through
+// the client provider tree (SessionProvider, QueryClientProvider).
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Tiketi — Event Booking & Ticketing",
   description:
