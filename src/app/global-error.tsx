@@ -1,5 +1,11 @@
 "use client";
 
+// Prevent Next.js from attempting a static prerender of /_global-error.
+// Without this, Netlify's non-standard NODE_ENV causes Next.js 16 to try
+// to prerender this page through the provider tree, hitting useContext on
+// a null React object.
+export const dynamic = "force-dynamic";
+
 /**
  * global-error.tsx — root-level error boundary.
  *
