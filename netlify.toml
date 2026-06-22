@@ -5,6 +5,11 @@
 [build.environment]
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
+  # These variables are not sensitive — their values appear in build output
+  # because PAYPACK_WEBHOOK_MODE is a mode flag ("production"/"development")
+  # and NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET is intentionally public.
+  # Omitting them from secrets scanning prevents false-positive build failures.
+  SECRETS_SCAN_OMIT_KEYS = "PAYPACK_WEBHOOK_MODE,NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
