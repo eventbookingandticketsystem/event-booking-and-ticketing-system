@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { QueryProvider } from "@/lib/api/QueryProvider";
-import AuthProvider from "@/app/auth/AuthProvider";
+import RootShell from "./RootShell";
 
 // Force all routes under the root layout to be dynamic so Next.js never
 // attempts to statically prerender /_not-found or /_global-error through
@@ -20,9 +19,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
-        <AuthProvider>
-          <QueryProvider>{children}</QueryProvider>
-        </AuthProvider>
+        <RootShell>{children}</RootShell>
       </body>
     </html>
   );
