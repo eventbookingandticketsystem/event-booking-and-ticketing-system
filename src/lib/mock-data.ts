@@ -196,6 +196,7 @@ export const EVENT_BY_ID: Record<string, EventType> = Object.fromEntries(
 export const MY_TICKETS: TicketType[] = [
   {
     id: "TIX-7K2M-9QX4",
+    qrPayload: "TIX-7K2M-9QX4:evt-jmf:mock-user",
     eventId: "evt-jmf",
     tier: "VIP",
     status: "Valid",
@@ -203,6 +204,7 @@ export const MY_TICKETS: TicketType[] = [
   },
   {
     id: "TIX-4B8N-2WP1",
+    qrPayload: "TIX-4B8N-2WP1:evt-tech:mock-user",
     eventId: "evt-tech",
     tier: "Delegate",
     status: "Valid",
@@ -210,6 +212,7 @@ export const MY_TICKETS: TicketType[] = [
   },
   {
     id: "TIX-1A5C-8RT6",
+    qrPayload: "TIX-1A5C-8RT6:evt-psl:mock-user",
     eventId: "evt-psl",
     tier: "General Stand",
     status: "Used",
