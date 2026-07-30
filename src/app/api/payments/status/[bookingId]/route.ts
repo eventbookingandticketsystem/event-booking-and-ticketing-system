@@ -1,13 +1,15 @@
 import { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import PaypackModule from "paypack-js";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const Paypack = (PaypackModule as any).default ?? PaypackModule;
 import prisma from "../../../../../../prisma/client";
 import { ok, forbidden, notFound, serverError } from "@/lib/api-utils";
 
 // GET /api/payments/status/[bookingId]
-// Returns the current booking status for polling on the payment page.
-// This endpoint only reads the DB — it never calls PayPack directly.
-// Confirmation happens via webhook (production) or the manual /api/payments/confirm
-// endpoint that the user triggers from the payment page.
+// Returns the current booking status. When the booking is PENDING and has a
+// paypackRef, it also queries PayPack live so that failures (sandbox or
+// production) are reflected immediately without requiring a webhook delivery.
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ bookingId: string }> },
@@ -27,17 +29,83 @@ export async function GET(
         paidAt: true,
         ref: true,
         total: true,
+        paypackRef: true,
+        lines: { select: { tierId: true, qty: true } },
       },
     });
 
     if (!booking) return notFound("Booking not found");
     if (booking.userId !== (token.id as string)) return forbidden("Access denied");
 
+    // If already settled, return immediately
+    if (booking.status !== "PENDING" || !booking.paypackRef) {
+      return ok({
+        id: booking.id,
+        ref: booking.ref,
+        status: booking.status,
+        paidAt: booking.paidAt,
+        total: booking.total,
+      });
+    }
+
+    // Still PENDING — query PayPack for the live transaction status
+    let liveStatus = "PENDING";
+    try {
+      const paypack = new Paypack({
+        client_id: process.env.PAYPACK_APPLICATION_ID!,
+        client_secret: process.env.PAYPACK_APPLICATION_SECRET!,
+      });
+      const txResult = await paypack.transaction(booking.paypackRef);
+      liveStatus = (txResult?.data?.status ?? "PENDING").toUpperCase();
+      console.log("[status] PayPack tx:", booking.paypackRef, "→", liveStatus);
+    } catch (paypackErr: unknown) {
+      const msg = (paypackErr as { message?: string })?.message ?? "";
+      console.warn("[status] PayPack query failed:", msg);
+      // If transaction not found, treat as failed
+      if (msg.toLowerCase().includes("not found")) liveStatus = "FAILED";
+      // Otherwise keep PENDING (PayPack unreachable — don't penalise the user)
+    }
+
+    if (liveStatus === "SUCCESSFUL") {
+      await prisma.$transaction([
+        prisma.booking.update({
+          where: { id: booking.id },
+          data: { status: "CONFIRMED", paidAt: new Date() },
+        }),
+        prisma.ticket.updateMany({
+          where: { bookingId: booking.id },
+          data: { status: "VALID" },
+        }),
+      ]);
+      return ok({ id: booking.id, ref: booking.ref, status: "CONFIRMED", paidAt: new Date(), total: booking.total });
+    }
+
+    if (liveStatus === "FAILED" || liveStatus === "CANCELLED") {
+      await prisma.$transaction([
+        prisma.booking.update({
+          where: { id: booking.id },
+          data: { status: "FAILED" },
+        }),
+        prisma.ticket.updateMany({
+          where: { bookingId: booking.id },
+          data: { status: "CANCELLED" },
+        }),
+        ...booking.lines.map((line) =>
+          prisma.ticketTier.update({
+            where: { id: line.tierId },
+            data: { remaining: { increment: line.qty } },
+          }),
+        ),
+      ]);
+      return ok({ id: booking.id, ref: booking.ref, status: "FAILED", paidAt: null, total: booking.total });
+    }
+
+    // Still genuinely pending (INITIATED / PROCESSING / etc.)
     return ok({
       id: booking.id,
       ref: booking.ref,
-      status: booking.status,
-      paidAt: booking.paidAt,
+      status: "PENDING",
+      paidAt: null,
       total: booking.total,
     });
   } catch (e) {

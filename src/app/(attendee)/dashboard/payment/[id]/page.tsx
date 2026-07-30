@@ -182,11 +182,25 @@ export default function PaymentPage({ params }: PageProps) {
         setConfirmError("Payment not yet received. Please wait a moment and try again.");
       }
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : "Could not check payment status. Please try again.";
-      setConfirmError(msg);
+      // Axios wraps 4xx responses — extract the API error message from the body
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
+      const apiMsg =
+        axiosErr?.response?.data?.error ??
+        axiosErr?.response?.data?.message ??
+        (err instanceof Error ? err.message : null) ??
+        "Could not check payment status. Please try again.";
+
+      // If PayPack says the transaction failed or isn't found, treat as definitive failure
+      const lower = apiMsg.toLowerCase();
+      if (
+        lower.includes("failed") ||
+        lower.includes("not found") ||
+        lower.includes("cancelled")
+      ) {
+        dispatch({ type: "FAILED" });
+      } else {
+        setConfirmError(apiMsg);
+      }
     } finally {
       setConfirmLoading(false);
     }

@@ -168,8 +168,13 @@ function OfflineSyncSheet({
   const [syncPct,   setSyncPct]   = useState(0);
 
   useEffect(() => {
-    if (syncPhase !== "syncing") return;
-    if (syncPct >= 100) { setSyncPhase("done"); return; }
+    if (syncPhase !== "syncing" || syncPct < 100) return;
+    const t = setTimeout(() => setSyncPhase("done"), 0);
+    return () => clearTimeout(t);
+  }, [syncPhase, syncPct]);
+
+  useEffect(() => {
+    if (syncPhase !== "syncing" || syncPct >= 100) return;
     const t = setTimeout(() => setSyncPct((p) => Math.min(100, p + 9)), 90);
     return () => clearTimeout(t);
   }, [syncPhase, syncPct]);
@@ -329,9 +334,11 @@ export default function ScannerPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     startCamera();
     return () => { streamRef.current?.getTracks().forEach((t) => t.stop()); };
-  }, [startCamera]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);  // run once on mount — startCamera is stable (useCallback with no deps)
 
   // ── Demo fire (quick-fire buttons + cycle) ────────────────────────────
   const randName = () => ATTENDEE_NAMES[Math.floor(Math.random() * ATTENDEE_NAMES.length)];

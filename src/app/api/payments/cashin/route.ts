@@ -114,6 +114,9 @@ export async function POST(req: NextRequest) {
     }
 
     const ref = result.data.ref;
+    const initialStatus = (result.data.status ?? "").toUpperCase();
+
+    console.log("[cashin] PayPack response:", JSON.stringify(result.data));
 
     // Store paypackRef and payerPhone on the booking
     await prisma.booking.update({
@@ -124,7 +127,27 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return ok({ ref, status: result.data.status });
+    // If PayPack immediately returned a terminal failure, settle the booking now
+    if (initialStatus === "FAILED" || initialStatus === "CANCELLED") {
+      const fullBooking = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        include: { lines: true },
+      });
+      if (fullBooking) {
+        await prisma.$transaction([
+          prisma.booking.update({ where: { id: bookingId }, data: { status: "FAILED" } }),
+          prisma.ticket.updateMany({ where: { bookingId }, data: { status: "CANCELLED" } }),
+          ...fullBooking.lines.map((line) =>
+            prisma.ticketTier.update({
+              where: { id: line.tierId },
+              data: { remaining: { increment: line.qty } },
+            }),
+          ),
+        ]);
+      }
+    }
+
+    return ok({ ref, status: initialStatus || result.data.status });
   } catch (e) {
     return serverError(e);
   }

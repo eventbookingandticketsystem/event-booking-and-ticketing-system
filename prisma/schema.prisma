@@ -38,6 +38,7 @@ enum PaymentMethod {
   MTN
   AIRTEL
   CASH
+  CARD
 }
 
 enum TicketStatus {

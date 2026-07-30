@@ -60,7 +60,7 @@ export default function BookingPage({ params }: PageProps) {
   // Start empty; populated when the user taps +/-.
   const [qtyOverrides, setQtyOverrides] = useState<Record<string, number>>({});
 
-  const [method, setMethod] = useState<"mtn" | "airtel">("mtn");
+  const [method, setMethod] = useState<"mtn" | "airtel" | "card">("mtn");
 
   // Phone modal state
   const [showPhoneModal, setShowPhoneModal] = useState(false);
@@ -108,7 +108,7 @@ export default function BookingPage({ params }: PageProps) {
   const subtotal = lines.reduce((s, l) => s + l.qty * l.price, 0);
   const total = subtotal + SERVICE_FEE;
 
-  const apiMethod = method === "mtn" ? "MTN" : "AIRTEL";
+  const apiMethod = method === "mtn" ? "MTN" : method === "airtel" ? "AIRTEL" : "CARD";
 
   // Step 1: create the booking, then open the phone modal
   const handleConfirm = async () => {
@@ -142,6 +142,16 @@ export default function BookingPage({ params }: PageProps) {
             booking.tickets?.length ?? lines.reduce((a, l) => a + l.qty, 0),
           ),
         );
+      }
+
+      if (method === "card") {
+        // Stripe — create a checkout session and redirect
+        const res = await apiClient.post<{ data: { url: string } }>("/payments/stripe-session", {
+          bookingId: booking.id,
+        });
+        const url = res.data.data.url;
+        if (url) window.location.href = url;
+        return;
       }
 
       setPendingBookingId(booking.id);
@@ -192,7 +202,7 @@ export default function BookingPage({ params }: PageProps) {
     setCashinError("");
   };
 
-  const methodLabel = method === "mtn" ? "MTN Mobile Money" : "Airtel Money";
+  const methodLabel = method === "mtn" ? "MTN Mobile Money" : method === "airtel" ? "Airtel Money" : "Credit / Debit Card";
 
   // ── Loading skeleton ─────────────────────────────────────────────────────────
   if (evLoading) {
@@ -381,18 +391,9 @@ export default function BookingPage({ params }: PageProps) {
             <div className="flex flex-col gap-3">
               {(
                 [
-                  {
-                    id: "mtn",
-                    label: "MTN Mobile Money",
-                    color: "#FFCC00",
-                    textColor: "#000",
-                  },
-                  {
-                    id: "airtel",
-                    label: "Airtel Money",
-                    color: "#FF0000",
-                    textColor: "#fff",
-                  },
+                  { id: "mtn",    label: "MTN Mobile Money", color: "#FFCC00", textColor: "#000", abbr: "MTN" },
+                  { id: "airtel", label: "Airtel Money",      color: "#FF0000", textColor: "#fff", abbr: "Airtel" },
+                  { id: "card",   label: "Credit / Debit Card (Stripe)", color: "#635BFF", textColor: "#fff", abbr: "Card" },
                 ] as const
               ).map((opt) => (
                 <label
@@ -416,7 +417,7 @@ export default function BookingPage({ params }: PageProps) {
                     className="inline-flex items-center justify-center w-10 h-10 rounded text-xs font-bold shrink-0"
                     style={{ background: opt.color, color: opt.textColor }}
                   >
-                    {opt.id === "mtn" ? "MTN" : "Airtel"}
+                    {opt.abbr}
                   </span>
                   <span className="flex-1 text-sm font-semibold text-text">
                     {opt.label}
@@ -424,9 +425,7 @@ export default function BookingPage({ params }: PageProps) {
                   <span
                     className={cn(
                       "w-5 h-5 rounded-full border-2 shrink-0 inline-flex items-center justify-center",
-                      method === opt.id
-                        ? "border-brand-orange"
-                        : "border-border",
+                      method === opt.id ? "border-brand-orange" : "border-border",
                     )}
                   >
                     {method === opt.id && (

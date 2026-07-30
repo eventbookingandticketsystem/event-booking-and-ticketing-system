@@ -1,14 +1,47 @@
 'use client';
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
 import { Button } from "@/components/Shared/Button";
 import { AlertBanner } from "@/components/Shared/AlertBanner";
 import { Icon } from "@/components/Shared/Icon";
 import { formatSSP, formatDate } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
+import apiClient from "@/lib/api/client";
 
 export default function ConfirmationPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // When Stripe redirects back with ?session_id=..., poll until the webhook
+  // has confirmed the booking, then clear the param.
+  useEffect(() => {
+    const sessionId = searchParams.get("session_id");
+    const bookingId = typeof window !== "undefined"
+      ? sessionStorage.getItem("tiketi-booking-id")
+      : null;
+    if (!sessionId || !bookingId) return;
+
+    let tries = 0;
+    const iv = setInterval(async () => {
+      tries++;
+      try {
+        const res = await apiClient.get<{ data: { status: string } }>(
+          `/payments/status/${encodeURIComponent(bookingId)}`,
+        );
+        if (res.data.data.status === "CONFIRMED") {
+          clearInterval(iv);
+          // remove session_id from URL without a page reload
+          const url = new URL(window.location.href);
+          url.searchParams.delete("session_id");
+          window.history.replaceState({}, "", url.toString());
+        }
+      } catch { /* keep polling */ }
+      if (tries >= 15) clearInterval(iv); // give up after 45s
+    }, 3000);
+
+    return () => clearInterval(iv);
+  }, [searchParams]);
 
   // Read all booking context persisted by the booking + payment pages
   const bookingRef   = typeof window !== "undefined"

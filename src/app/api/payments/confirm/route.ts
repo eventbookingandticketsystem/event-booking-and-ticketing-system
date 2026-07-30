@@ -57,14 +57,36 @@ export async function POST(req: NextRequest) {
 
     let txStatus = "PENDING";
     try {
-      const txResult = await paypack.findOne({ ref: booking.paypackRef });
+      const txResult = await paypack.transaction(booking.paypackRef);
       txStatus = (txResult?.data?.status ?? "").toUpperCase();
       console.log("[confirm] PayPack tx:", booking.paypackRef, "→", txStatus);
     } catch (paypackErr: unknown) {
-      console.error(
-        "[confirm] PayPack findOne error:",
-        JSON.stringify(paypackErr, Object.getOwnPropertyNames(paypackErr as object)),
-      );
+      const errObj = paypackErr as { message?: string; status?: number };
+      const msg = errObj?.message ?? "unknown";
+      console.error("[confirm] PayPack error:", msg, JSON.stringify(paypackErr, Object.getOwnPropertyNames(paypackErr as object)));
+
+      // "transaction not found" means PayPack has no record — treat as failed
+      const lower = msg.toLowerCase();
+      if (lower.includes("not found") || lower.includes("failed") || lower.includes("cancelled")) {
+        await prisma.$transaction([
+          prisma.booking.update({
+            where: { id: booking.id },
+            data: { status: "FAILED" },
+          }),
+          prisma.ticket.updateMany({
+            where: { bookingId: booking.id },
+            data: { status: "CANCELLED" },
+          }),
+          ...booking.lines.map((line) =>
+            prisma.ticketTier.update({
+              where: { id: line.tierId },
+              data: { remaining: { increment: line.qty } },
+            }),
+          ),
+        ]);
+        return ok({ status: "FAILED", ref: booking.ref });
+      }
+
       return badRequest("Could not reach payment provider. Please try again.");
     }
 
