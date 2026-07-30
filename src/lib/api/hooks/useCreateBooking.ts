@@ -10,7 +10,7 @@ export interface BookingLine {
 export interface CreateBookingInput {
   eventId: string;
   lines: BookingLine[];
-  method: "MTN" | "AIRTEL" | "CASH";
+  method: "MTN" | "AIRTEL" | "CASH" | "CARD";
 }
 
 /**
