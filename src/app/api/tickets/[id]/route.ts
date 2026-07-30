@@ -54,11 +54,13 @@ function canAccess(
   tokenRole: unknown,
 ): boolean {
   if (tokenRole === "ADMIN") return true;
+  // Any role can view a ticket they personally own
+  if (ticket.ownerId === tokenId) return true;
+  // Organizers can view tickets for their events
   if (tokenRole === "ORGANIZER") {
     return ticket.event.orgProfile?.userId === tokenId;
   }
-  // ATTENDEE — must own the ticket
-  return ticket.ownerId === tokenId;
+  return false;
 }
 
 // ── GET /api/tickets/[id] — auth required ─────────────────────────────────
