@@ -7,46 +7,44 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Icon } from "@/components/Shared/Icon";
 import { cn } from "@/lib/utils";
-import { ATTENDEE_NAMES } from "@/lib/mock-data";
 import { ROUTES } from "@/constants/routes";
 import { useScan } from "@/lib/api/hooks/useScan";
 import type { ScanOutcome } from "@/lib/api/hooks/useScan";
-
-// ── Types ──────────────────────────────────────────────────────────────────
 
 type ResultKind = "admit" | "used" | "invalid" | "wrong" | "expired";
 type CamState   = "requesting" | "active" | "denied" | "unavailable";
 
 interface ScanResult {
-  kind: ResultKind;
-  name?: string;
-  tier?: string;
-  /** Dynamic sub-text from API (overrides static config sub) */
-  sub?:  string;
+  kind:       ResultKind;
+  name?:      string;
+  tier?:      string;
+  sub?:       string;
+  eventTitle?: string;
+  gate?:       string;
+  scannedAt?:  string;
 }
 
-// Map API outcome discriminant → local UI ResultKind + populate dynamic fields
-function outcomeToResult(o: ScanOutcome): ScanResult {
+function outcomeToResult(o: ScanOutcome, eventTitle: string, gate: string): ScanResult {
+  const scannedAt = new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
   switch (o.result) {
     case "ADMIT":
-      return { kind: "admit", name: o.attendee, tier: o.tier };
+      return { kind: "admit", name: o.attendee, tier: o.tier, eventTitle, gate, scannedAt };
     case "ALREADY_USED": {
-      let usedAtStr = "Ticket has already been scanned";
+      let sub = "Ticket has already been scanned";
       if (o.usedAt) {
         const d = new Date(o.usedAt);
-        if (!isNaN(d.getTime())) {
-          usedAtStr = `First scanned at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
-        }
+        if (!isNaN(d.getTime()))
+          sub = `First scanned at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
       }
-      return { kind: "used", sub: usedAtStr };
+      return { kind: "used", sub, eventTitle, gate, scannedAt };
     }
     case "EXPIRED":
-      return { kind: "expired", sub: o.message };
+      return { kind: "expired", sub: o.message, eventTitle, gate, scannedAt };
     case "WRONG_EVENT":
-      return { kind: "wrong", sub: o.message };
+      return { kind: "wrong", sub: o.message, eventTitle, gate, scannedAt };
     case "INVALID":
     default:
-      return { kind: "invalid", sub: o.message };
+      return { kind: "invalid", sub: o.message ?? "This ticket could not be verified", eventTitle, gate, scannedAt };
   }
 }
 
@@ -54,54 +52,32 @@ const RESULT_CONFIG: Record<ResultKind, {
   bg: string;
   icon: "CircleCheck" | "X" | "TriangleAlert" | "Clock";
   verdict: string;
-  sub?: string;         // fallback sub-text for demo mode
   showName?: boolean;
 }> = {
-  admit: {
-    bg: "#1A7A4A",
-    icon: "CircleCheck",
-    verdict: "ADMIT",
-    showName: true,
-  },
-  used: {
-    bg: "#A32D2D",
-    icon: "X",
-    verdict: "ALREADY USED",
-    sub: "First scanned at 2:34 PM at Gate A",
-  },
-  invalid: {
-    bg: "#A32D2D",
-    icon: "X",
-    verdict: "INVALID TICKET",
-    sub: "This ticket could not be verified",
-  },
-  wrong: {
-    bg: "#7A4A00",
-    icon: "TriangleAlert",
-    verdict: "WRONG EVENT",
-    sub: "This ticket is for a different event",
-  },
-  expired: {
-    bg: "#1a2030",
-    icon: "Clock",
-    verdict: "TICKET EXPIRED",
-    sub: "This ticket is no longer valid",
-  },
+  admit:   { bg: "#1A7A4A", icon: "CircleCheck", verdict: "ADMIT",          showName: true  },
+  used:    { bg: "#A32D2D", icon: "X",            verdict: "ALREADY USED"                    },
+  invalid: { bg: "#A32D2D", icon: "X",            verdict: "INVALID TICKET"                  },
+  wrong:   { bg: "#7A4A00", icon: "TriangleAlert", verdict: "WRONG EVENT"                    },
+  expired: { bg: "#1a2030", icon: "Clock",         verdict: "TICKET EXPIRED"                 },
 };
 
-const DEMO_CYCLE: ResultKind[] = ["admit", "used", "invalid", "wrong", "expired"];
+// ── Scanning progress overlay ──────────────────────────────────────────────
 
-// ── Result Overlay ─────────────────────────────────────────────────────────
+function ScanningOverlay() {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-black/70 backdrop-blur-sm">
+      <div className="w-16 h-16 rounded-full border-4 border-brand-orange/30 border-t-brand-orange animate-spin" />
+      <p className="text-white font-semibold text-[16px]">Verifying ticket…</p>
+      <p className="text-white/50 text-sm">Checking against system records</p>
+    </div>
+  );
+}
 
-function ResultOverlay({
-  result,
-  onReset,
-}: {
-  result: ScanResult;
-  onReset: () => void;
-}) {
+// ── Result overlay ─────────────────────────────────────────────────────────
+
+function ResultOverlay({ result, onReset }: { result: ScanResult; onReset: () => void }) {
   const cfg = RESULT_CONFIG[result.kind];
-  const [countdown, setCountdown] = useState(2);
+  const [countdown, setCountdown] = useState(4);
 
   useEffect(() => {
     if (countdown <= 0) { onReset(); return; }
@@ -109,208 +85,108 @@ function ResultOverlay({
     return () => clearTimeout(t);
   }, [countdown, onReset]);
 
-  // Use API-supplied sub-text if available, fall back to static config
-  const subText = result.sub ?? cfg.sub;
-
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 px-6 cursor-pointer select-none"
+      className="fixed inset-0 z-50 flex flex-col"
       style={{ background: cfg.bg }}
       role="alert"
       aria-live="assertive"
       onClick={onReset}
     >
-      <Icon name={cfg.icon} size={64} strokeWidth={2.5} className="text-white" />
+      {/* Main verdict — centred, takes most of the space */}
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 px-8">
+        <Icon name={cfg.icon} size={72} strokeWidth={2} className="text-white" />
 
-      <h1
-        className={cn(
+        <h1 className={cn(
           "font-display font-bold text-white text-center leading-none",
-          result.kind === "admit" ? "text-[72px]" : "text-[56px]",
-        )}
-      >
-        {cfg.verdict}
-      </h1>
+          result.kind === "admit" ? "text-[80px]" : "text-[60px]",
+        )}>
+          {cfg.verdict}
+        </h1>
 
-      {cfg.showName && result.name && (
-        <div className="flex flex-col items-center gap-2 mt-1">
-          <p className="text-white/90 text-[22px] font-semibold text-center">{result.name}</p>
-          {result.tier && (
-            <span className="px-4 py-1.5 rounded-pill border-2 border-white/50 text-white text-[15px] font-semibold">
-              {result.tier}
+        {cfg.showName && result.name && (
+          <div className="flex flex-col items-center gap-2 mt-2">
+            <p className="text-white/90 text-[24px] font-semibold text-center">{result.name}</p>
+            {result.tier && (
+              <span className="px-5 py-1.5 rounded-full border-2 border-white/40 text-white text-[15px] font-semibold">
+                {result.tier}
+              </span>
+            )}
+          </div>
+        )}
+
+        {!cfg.showName && result.sub && (
+          <p className="text-white/70 text-[18px] text-center max-w-xs leading-snug">{result.sub}</p>
+        )}
+      </div>
+
+      {/* Event details panel at bottom */}
+      <div
+        className="shrink-0 px-6 py-5 mx-4 mb-6 rounded-2xl flex flex-col gap-2"
+        style={{ background: "rgba(0,0,0,0.25)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {result.eventTitle && (
+          <div className="flex items-center gap-2 text-white/80 text-sm">
+            <Icon name="Ticket" size={14} className="shrink-0 text-white/50" />
+            <span className="font-semibold truncate">{result.eventTitle}</span>
+          </div>
+        )}
+        <div className="flex items-center gap-4 text-white/50 text-[12px]">
+          {result.gate && (
+            <span className="flex items-center gap-1">
+              <Icon name="DoorOpen" size={12} />
+              Gate {result.gate}
+            </span>
+          )}
+          {result.scannedAt && (
+            <span className="flex items-center gap-1">
+              <Icon name="Clock" size={12} />
+              {result.scannedAt}
             </span>
           )}
         </div>
-      )}
+      </div>
 
-      {!cfg.showName && subText && (
-        <p className="text-white/70 text-[18px] text-center max-w-70 leading-snug">
-          {subText}
-        </p>
-      )}
-
-      <div className="absolute bottom-8 flex items-center gap-2 text-white/60 text-sm">
-        <Icon name="RotateCcw" size={14} />
-        Auto-reset in {countdown}s
+      <div className="absolute bottom-4 w-full flex items-center justify-center gap-2 text-white/40 text-sm">
+        <Icon name="RotateCcw" size={13} />
+        Tap to reset · auto in {countdown}s
       </div>
     </div>
-  );
-}
-
-// ── Offline Sync Sheet ─────────────────────────────────────────────────────
-
-function OfflineSyncSheet({
-  online,
-  onRestore,
-  onClose,
-}: {
-  online: boolean;
-  onRestore: () => void;
-  onClose: () => void;
-}) {
-  const [syncPhase, setSyncPhase] = useState<"idle" | "syncing" | "done">("idle");
-  const [syncPct,   setSyncPct]   = useState(0);
-
-  useEffect(() => {
-    if (syncPhase !== "syncing" || syncPct < 100) return;
-    const t = setTimeout(() => setSyncPhase("done"), 0);
-    return () => clearTimeout(t);
-  }, [syncPhase, syncPct]);
-
-  useEffect(() => {
-    if (syncPhase !== "syncing" || syncPct >= 100) return;
-    const t = setTimeout(() => setSyncPct((p) => Math.min(100, p + 9)), 90);
-    return () => clearTimeout(t);
-  }, [syncPhase, syncPct]);
-
-  const handleSync = () => { setSyncPct(0); setSyncPhase("syncing"); };
-
-  return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/50" onClick={onClose} aria-hidden="true" />
-      <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center">
-        <div
-          className="w-full max-w-97.5 rounded-t-2xl p-5"
-          style={{ background: "#0e1c29" }}
-          role="dialog"
-          aria-label="Offline sync"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="w-10 h-1.5 rounded-pill bg-white/20 mx-auto mb-5" aria-hidden="true" />
-
-          <h2 className="font-display font-bold text-[18px] text-white mb-1">Offline mode</h2>
-          <p className="text-white/60 text-sm mb-4">
-            Scans are saved on this device and uploaded when you reconnect.
-          </p>
-
-          {[
-            { label: "Scans recorded locally", value: "38" },
-            { label: "Pending sync",            value: syncPhase === "done" ? "0" : "38", highlight: syncPhase === "done" ? "#8fe0ad" : "#f0c878" },
-            { label: "Last sync",               value: "Today, 6:12 PM" },
-          ].map(({ label, value, highlight }) => (
-            <div key={label} className="flex items-center justify-between py-3 border-b border-white/8 last:border-b-0">
-              <span className="text-sm text-white/70">{label}</span>
-              <span className="font-mono text-sm font-semibold" style={{ color: highlight ?? "rgba(255,255,255,0.9)" }}>
-                {value}
-              </span>
-            </div>
-          ))}
-
-          {syncPhase === "syncing" && (
-            <div className="mt-4 flex flex-col gap-2">
-              <div className="flex items-center justify-between text-[13px] text-white">
-                <span className="text-white/70">Uploading scans…</span>
-                <span className="font-mono">{syncPct}%</span>
-              </div>
-              <div className="h-2 rounded-pill bg-white/10 overflow-hidden">
-                <div
-                  className="h-full rounded-pill bg-brand-orange transition-[width] duration-100"
-                  style={{ width: `${syncPct}%` }}
-                  role="progressbar"
-                  aria-valuenow={syncPct}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                />
-              </div>
-            </div>
-          )}
-
-          {syncPhase === "done" && (
-            <div className="flex items-center gap-3 mt-4 px-4 py-3 rounded-lg bg-[#1A4A2A] text-sm font-semibold text-white">
-              <Icon name="CircleCheck" size={18} className="text-[#8fe0ad] shrink-0" />
-              All scans uploaded
-            </div>
-          )}
-
-          <div className="flex flex-col gap-3 mt-5">
-            <button
-              type="button"
-              disabled={!online || syncPhase === "syncing"}
-              onClick={handleSync}
-              aria-label="Sync now"
-              className={cn(
-                "flex items-center justify-center gap-2 w-full h-12 rounded-xl font-bold text-[15px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange",
-                online && syncPhase !== "syncing"
-                  ? "bg-brand-orange text-white hover:bg-brand-orange-hover"
-                  : "bg-white/10 text-white/30 cursor-not-allowed",
-              )}
-            >
-              {syncPhase === "syncing" ? (
-                <>
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                  </svg>
-                  Syncing…
-                </>
-              ) : syncPhase === "done" ? "Synced" : online ? "Sync now" : "Sync now (offline)"}
-            </button>
-
-            <button
-              type="button"
-              onClick={onRestore}
-              className="flex items-center justify-center w-full h-12 rounded-xl border border-white/30 text-white text-[14px] font-semibold hover:bg-white/8 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-            >
-              {online ? "Connection restored" : "Simulate connection restored"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </>
   );
 }
 
 // ── Main Scanner Page ──────────────────────────────────────────────────────
 
 export default function ScannerPage() {
-  const router      = useRouter();
+  const router       = useRouter();
   const searchParams = useSearchParams();
-  const videoRef    = useRef<HTMLVideoElement>(null);
-  const streamRef   = useRef<MediaStream | null>(null);
+  const videoRef     = useRef<HTMLVideoElement>(null);
+  const canvasRef    = useRef<HTMLCanvasElement>(null);
+  const streamRef    = useRef<MediaStream | null>(null);
+  const scanLoopRef  = useRef<number | null>(null);
+  const lastPayload  = useRef<string>("");   // debounce: don't re-scan same code twice
 
-  // Real IDs passed by G1 via query string; empty strings when accessed directly
-  const agentId    = searchParams.get("agentId") ?? "";
-  const eventId    = searchParams.get("eventId") ?? "";
-  const gate       = searchParams.get("gate")    ?? "A";
-  const eventTitle = searchParams.get("eventTitle") ?? searchParams.get("eventId") ?? "Current event";
+  const agentId    = searchParams.get("agentId")    ?? "";
+  const eventId    = searchParams.get("eventId")    ?? "";
+  const gate       = searchParams.get("gate")       ?? "A";
+  const eventTitle = searchParams.get("eventTitle") ?? searchParams.get("eventId") ?? "Current Event";
 
-  const [camState,  setCamState]  = useState<CamState>("requesting");
-  const [online,    setOnline]    = useState(true);
-  const [admitted,  setAdmitted]  = useState(0);
-  const [result,    setResult]    = useState<ScanResult | null>(null);
-  const [menuOpen,  setMenuOpen]  = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const cycleRef = useRef(0);
+  const [camState,    setCamState]    = useState<CamState>("requesting");
+  const [online,      setOnline]      = useState(true);
+  const [admitted,    setAdmitted]    = useState(0);
+  const [result,      setResult]      = useState<ScanResult | null>(null);
+  const [scanning,    setScanning]    = useState(false);
+  const [menuOpen,    setMenuOpen]    = useState(false);
 
-  // ── Scan mutation ──────────────────────────────────────────────────────
   const scanMutation = useScan();
 
-  // ── Camera ────────────────────────────────────────────────────────────
+  // ── Camera ────────────────────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
     setCamState("requesting");
     if (
       typeof navigator === "undefined" ||
-      !navigator.mediaDevices ||
-      typeof navigator.mediaDevices.getUserMedia !== "function"
+      !navigator.mediaDevices?.getUserMedia
     ) {
       setCamState("unavailable");
       return;
@@ -323,223 +199,278 @@ export default function ScannerPage() {
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        try { await videoRef.current.play(); } catch { /* already playing */ }
+        await videoRef.current.play().catch(() => {});
       }
       setCamState("active");
     } catch (err) {
-      const errName = (err as Error).name;
-      setCamState(
-        errName === "NotAllowedError" || errName === "PermissionDeniedError"
-          ? "denied"
-          : "unavailable",
-      );
+      const name = (err as Error).name;
+      setCamState(name === "NotAllowedError" || name === "PermissionDeniedError" ? "denied" : "unavailable");
     }
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     startCamera();
-    return () => { streamRef.current?.getTracks().forEach((t) => t.stop()); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);  // run once on mount — startCamera is stable (useCallback with no deps)
-
-  // ── Demo fire (quick-fire buttons + cycle) ────────────────────────────
-  const randName = () => ATTENDEE_NAMES[Math.floor(Math.random() * ATTENDEE_NAMES.length)];
-
-  const fireDemoResult = useCallback((kind: ResultKind) => {
-    const r: ScanResult =
-      kind === "admit" ? { kind, name: randName(), tier: "General Admission" } : { kind };
-    setResult(r);
-    if (kind === "admit") setAdmitted((a) => a + 1);
-  // randName is stable (no deps) — suppress exhaustive-deps warning
+    return () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      if (scanLoopRef.current) cancelAnimationFrame(scanLoopRef.current);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Real scan ─────────────────────────────────────────────────────────
-  // Called when a QR payload is decoded from the camera (or from the
-  // "Real scan" test button).  Falls back to demo cycle when agentId/
-  // eventId are not available (e.g. navigated to /agent/scanner directly).
+  // ── Real scan ─────────────────────────────────────────────────────────────
   const fireRealScan = useCallback(async (qrPayload: string) => {
-    if (!agentId || !eventId) {
-      // No context — treat as demo
-      const kind = DEMO_CYCLE[cycleRef.current % DEMO_CYCLE.length];
-      cycleRef.current++;
-      fireDemoResult(kind);
-      return;
-    }
+    if (!agentId || !eventId) return;   // no context — do nothing (no demo mode)
+    if (scanning) return;
+    setScanning(true);
     try {
       const outcome = await scanMutation.mutateAsync({ qrPayload, eventId, gate, agentId });
-      const r = outcomeToResult(outcome);
+      const r = outcomeToResult(outcome, eventTitle, gate);
       setResult(r);
       if (r.kind === "admit") setAdmitted((a) => a + 1);
     } catch {
-      setResult({ kind: "invalid", sub: "Network error — scan recorded offline" });
+      setResult({ kind: "invalid", sub: "Network error — could not verify", eventTitle, gate });
+    } finally {
+      setScanning(false);
     }
-  }, [agentId, eventId, gate, scanMutation, fireDemoResult]);
+  }, [agentId, eventId, gate, eventTitle, scanning, scanMutation]);
 
-  // ── Main "Scan QR" button ─────────────────────────────────────────────
-  // Cycles through demo outcomes (same as before). In a production build
-  // this button would be replaced by automatic decoding from the camera
-  // feed — the real API path is exposed via fireRealScan / the test button.
-  const handleScanButton = () => {
-    const kind = DEMO_CYCLE[cycleRef.current % DEMO_CYCLE.length];
-    cycleRef.current++;
-    fireDemoResult(kind);
+  // ── jsQR camera loop ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (camState !== "active" || result || scanning) return;
+
+    let active = true;
+
+    const tick = async () => {
+      if (!active) return;
+      const video  = videoRef.current;
+      const canvas = canvasRef.current;
+      if (
+        video && canvas &&
+        video.readyState === video.HAVE_ENOUGH_DATA &&
+        video.videoWidth > 0
+      ) {
+        canvas.width  = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          // Dynamically import jsqr to avoid SSR issues
+          const jsQR = (await import("jsqr")).default;
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "dontInvert",
+          });
+          if (code && code.data && code.data !== lastPayload.current) {
+            lastPayload.current = code.data;
+            await fireRealScan(code.data);
+            // reset debounce after 3 s so the same code can be re-scanned
+            setTimeout(() => { lastPayload.current = ""; }, 3000);
+            return;
+          }
+        }
+      }
+      scanLoopRef.current = requestAnimationFrame(tick);
+    };
+
+    scanLoopRef.current = requestAnimationFrame(tick);
+    return () => {
+      active = false;
+      if (scanLoopRef.current) cancelAnimationFrame(scanLoopRef.current);
+    };
+  }, [camState, result, scanning, fireRealScan]);
+
+  const handleReset = () => {
+    setResult(null);
+    lastPayload.current = "";
   };
-
-  const handleReset      = () => setResult(null);
-  const handlePillClick  = () => { if (online) setOnline(false); else setSheetOpen(true); };
 
   const cashEntryUrl = agentId
     ? `${ROUTES.AGENT_CASH}?agentId=${agentId}&eventId=${eventId}&gate=${gate}`
     : ROUTES.AGENT_CASH;
 
   return (
-    <div className="h-full bg-brand-navy flex flex-col overflow-hidden relative">
+    <div className="h-full bg-brand-navy flex flex-col md:flex-row overflow-hidden relative">
 
-      {/* ── Info bar ── */}
-      <div className="h-10 flex items-center gap-2 px-4 shrink-0 border-b border-white/8 bg-brand-navy-2/60">
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <Icon name="Ticket" size={14} className="text-brand-orange shrink-0" />
-          <span className="text-white/70 text-xs truncate">{eventTitle}</span>
+      {/* ── Sidebar (desktop) ── */}
+      <aside className="hidden md:flex flex-col w-64 shrink-0 border-r border-white/8 bg-brand-navy-2/60 p-5 gap-6">
+        <div className="flex items-center gap-3">
+          <span className="w-9 h-9 rounded-md bg-brand-orange inline-flex items-center justify-center shrink-0">
+            <Icon name="ScanLine" size={18} className="text-white" />
+          </span>
+          <span className="font-display font-bold text-[16px] text-white">Tiketi Gate</span>
         </div>
 
-        <span className="font-mono text-white text-xs shrink-0 px-1">
-          {admitted.toLocaleString()} <span className="text-white/40">in</span>
-        </span>
+        <div className="flex flex-col gap-1">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-white/40 mb-1">Event</div>
+          <div className="text-white font-semibold text-[14px] leading-snug">{eventTitle}</div>
+          <div className="text-white/40 text-[12px] mt-0.5">Gate {gate}</div>
+        </div>
 
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-white/50">Admitted</span>
+            <span className="font-mono font-bold text-white text-[20px]">{admitted}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-white/50">Status</span>
+            <span className={cn(
+              "flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded-pill",
+              online ? "bg-status-success-bg text-status-success" : "bg-status-warning-bg text-status-warning"
+            )}>
+              <Icon name={online ? "Wifi" : "WifiOff"} size={11} />
+              {online ? "Online" : "Offline"}
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-auto flex flex-col gap-1">
+          {[
+            { icon: "Wallet" as const,  label: "Cash entry",   action: () => router.push(cashEntryUrl) },
+            { icon: "House"  as const,  label: "Home",         action: () => router.push(ROUTES.HOME)  },
+            { icon: "LogOut" as const,  label: "Sign out",     action: () => signOut({ redirect: true, callbackUrl: "/login" }) },
+          ].map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={item.action}
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-[13px] font-medium text-white/60 hover:bg-white/8 hover:text-white transition-colors"
+            >
+              <Icon name={item.icon} size={16} />
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </aside>
+
+      {/* ── Mobile top bar ── */}
+      <div className="md:hidden flex items-center justify-between h-10 px-4 shrink-0 border-b border-white/8 bg-brand-navy-2/60">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <Icon name="Ticket" size={13} className="text-brand-orange shrink-0" />
+          <span className="text-white/70 text-xs truncate">{eventTitle} · Gate {gate}</span>
+        </div>
+        <span className="font-mono text-white text-xs px-1 shrink-0">
+          {admitted} <span className="text-white/40">in</span>
+        </span>
         <button
           type="button"
-          onClick={handlePillClick}
-          aria-label={online ? "Online — tap for sync" : "Offline — tap for sync"}
+          onClick={() => setOnline((o) => !o)}
           className={cn(
-            "flex items-center gap-1 px-2 py-0.5 rounded-pill text-[11px] font-semibold shrink-0 transition-colors",
-            online
-              ? "bg-status-success-bg text-status-success"
-              : "bg-status-warning-bg text-status-warning",
+            "flex items-center gap-1 px-2 py-0.5 rounded-pill text-[11px] font-semibold shrink-0 ml-2",
+            online ? "bg-status-success-bg text-status-success" : "bg-status-warning-bg text-status-warning",
           )}
         >
           <Icon name={online ? "Wifi" : "WifiOff"} size={11} />
           {online ? "Online" : "Offline"}
         </button>
-
         <button
           type="button"
           onClick={() => setMenuOpen((m) => !m)}
-          aria-label="Open menu"
-          aria-expanded={menuOpen}
-          className="w-7 h-7 rounded-full inline-flex items-center justify-center text-white/60 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+          className="w-7 h-7 ml-1 rounded-full inline-flex items-center justify-center text-white/60 hover:bg-white/10"
         >
           <Icon name="Ellipsis" size={16} />
         </button>
       </div>
 
-      {/* ── Offline banner ── */}
-      {!online && (
-        <div className="flex items-center justify-center gap-2 py-2 bg-status-warning-bg text-status-warning text-[13px] font-semibold shrink-0 z-20">
-          <Icon name="WifiOff" size={14} />
-          Offline mode — scans saved locally
-        </div>
-      )}
-
       {/* ── Viewfinder area ── */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-5 relative overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-center gap-5 relative overflow-hidden p-4 md:p-8">
 
-        <div className="relative w-70 h-70 md:w-85 md:h-85">
-
-          {/* Dark bg fallback */}
-          <div className="absolute inset-0 rounded-xl overflow-hidden bg-[#040d14]">
-            <div
-              className="absolute inset-0"
-              style={{ backgroundImage: "repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 32px), repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 32px)" }}
-              aria-hidden="true"
-            />
+        {/* Desktop stat strip */}
+        <div className="hidden md:flex items-center gap-6 w-full max-w-lg mb-2">
+          <div className="flex flex-col">
+            <span className="text-white/40 text-[11px] uppercase tracking-wider">Admitted</span>
+            <span className="font-mono text-white font-bold text-[28px]">{admitted}</span>
           </div>
+          {scanning && (
+            <span className="flex items-center gap-2 text-brand-orange text-sm font-semibold animate-pulse">
+              <Icon name="ScanLine" size={14} />
+              Verifying…
+            </span>
+          )}
+        </div>
 
-          {/* Camera video */}
+        {/* Camera box */}
+        <div className="relative w-full max-w-lg aspect-square md:aspect-video rounded-2xl overflow-hidden bg-[#040d14] shadow-2xl">
+
+          {/* Grid overlay */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ backgroundImage: "repeating-linear-gradient(0deg,rgba(255,255,255,.03) 0 1px,transparent 1px 32px),repeating-linear-gradient(90deg,rgba(255,255,255,.03) 0 1px,transparent 1px 32px)" }}
+            aria-hidden="true"
+          />
+
           <video
             ref={videoRef}
             muted
             playsInline
             autoPlay
-            aria-label="Camera viewfinder"
             className={cn(
-              "absolute inset-0 w-full h-full object-cover rounded-xl transition-opacity duration-300",
+              "absolute inset-0 w-full h-full object-cover transition-opacity duration-300",
               camState === "active" ? "opacity-100" : "opacity-0",
             )}
           />
+          {/* Hidden canvas for jsQR frame extraction */}
+          <canvas ref={canvasRef} className="hidden" aria-hidden="true" />
 
-          {/* Camera state overlay */}
+          {/* Camera state overlays */}
           {camState !== "active" && (
-            <div className="absolute inset-0 rounded-xl flex flex-col items-center justify-center gap-3 px-5 z-10">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 z-10">
               {camState === "requesting" && (
                 <>
-                  <svg className="animate-spin h-7 w-7 text-brand-orange/60" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <svg className="animate-spin h-8 w-8 text-brand-orange/60" viewBox="0 0 24 24" fill="none">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                   </svg>
-                  <p className="text-white/50 text-[13px] text-center">Requesting camera access…</p>
+                  <p className="text-white/50 text-sm text-center">Requesting camera access…</p>
                 </>
               )}
               {camState === "denied" && (
                 <>
-                  <Icon name="CameraOff" size={28} className="text-white/30" />
-                  <p className="text-white/55 text-[13px] text-center leading-snug">
+                  <Icon name="CameraOff" size={32} className="text-white/30" />
+                  <p className="text-white/60 text-sm text-center leading-snug">
                     Camera blocked.<br />
-                    <span className="text-white/35 text-[11px]">Allow access in browser settings, then retry.</span>
+                    <span className="text-white/35 text-xs">Allow access in browser settings, then retry.</span>
                   </p>
-                  <button
-                    type="button"
-                    onClick={startCamera}
-                    aria-label="Retry camera access"
-                    className="px-4 py-1.5 rounded-lg bg-brand-orange/20 border border-brand-orange/40 text-brand-orange text-[12px] font-semibold hover:bg-brand-orange/30 transition-colors"
-                  >
+                  <button type="button" onClick={startCamera} className="px-4 py-2 rounded-lg bg-brand-orange/20 border border-brand-orange/40 text-brand-orange text-sm font-semibold hover:bg-brand-orange/30 transition-colors">
                     Retry
                   </button>
                 </>
               )}
               {camState === "unavailable" && (
                 <>
-                  <Icon name="CameraOff" size={28} className="text-white/30" />
-                  <p className="text-white/55 text-[13px] text-center leading-snug">
-                    No camera available.<br />
-                    <span className="text-white/35 text-[11px]">Use the demo buttons below to simulate scans.</span>
-                  </p>
+                  <Icon name="CameraOff" size={32} className="text-white/30" />
+                  <p className="text-white/60 text-sm text-center">No camera available on this device.</p>
                 </>
               )}
             </div>
           )}
 
           {/* Animated scan line */}
-          <div
-            className="absolute left-3 right-3 h-0.5 rounded-full z-20 pointer-events-none"
-            style={{
-              background: "linear-gradient(90deg, transparent, #FF5A00, transparent)",
-              boxShadow: "0 0 8px 2px rgba(255,90,0,0.5)",
-              animation: "scanline 1.8s ease-in-out infinite alternate",
-            }}
-            aria-hidden="true"
-          />
+          {camState === "active" && (
+            <div
+              className="absolute left-4 right-4 h-0.5 rounded-full z-20 pointer-events-none"
+              style={{
+                background: "linear-gradient(90deg,transparent,#FF5A00,transparent)",
+                boxShadow: "0 0 8px 2px rgba(255,90,0,0.5)",
+                animation: "scanline 1.8s ease-in-out infinite alternate",
+              }}
+              aria-hidden="true"
+            />
+          )}
 
           {/* Corner brackets */}
-          {[
-            { top: -1,    left: -1,  borderTop: true,    borderLeft: true    },
-            { top: -1,    right: -1, borderTop: true,    borderRight: true   },
-            { bottom: -1, left: -1,  borderBottom: true, borderLeft: true    },
-            { bottom: -1, right: -1, borderBottom: true, borderRight: true   },
-          ].map((pos, i) => (
+          {["tl","tr","bl","br"].map((pos) => (
             <span
-              key={i}
-              className="absolute w-7 h-7 z-20"
+              key={pos}
+              className="absolute w-8 h-8 z-20"
               style={{
-                top:               pos.top    !== undefined ? pos.top    : undefined,
-                bottom:            pos.bottom !== undefined ? pos.bottom : undefined,
-                left:              pos.left   !== undefined ? pos.left   : undefined,
-                right:             pos.right  !== undefined ? pos.right  : undefined,
-                borderTopWidth:    pos.borderTop    ? 3 : 0,
-                borderBottomWidth: pos.borderBottom ? 3 : 0,
-                borderLeftWidth:   pos.borderLeft   ? 3 : 0,
-                borderRightWidth:  pos.borderRight  ? 3 : 0,
+                top:               pos.startsWith("t") ? -1 : undefined,
+                bottom:            pos.startsWith("b") ? -1 : undefined,
+                left:              pos.endsWith("l")   ? -1 : undefined,
+                right:             pos.endsWith("r")   ? -1 : undefined,
+                borderTopWidth:    pos.startsWith("t") ? 3 : 0,
+                borderBottomWidth: pos.startsWith("b") ? 3 : 0,
+                borderLeftWidth:   pos.endsWith("l")   ? 3 : 0,
+                borderRightWidth:  pos.endsWith("r")   ? 3 : 0,
                 borderColor: "#FF5A00",
                 borderStyle: "solid",
               }}
@@ -548,61 +479,33 @@ export default function ScannerPage() {
           ))}
         </div>
 
-        {/* Hint text */}
-        <p className="text-white/50 text-sm text-center">
-          {camState === "active"
-            ? "Point camera at a ticket QR code"
+        <p className="text-white/40 text-sm text-center">
+          {!agentId
+            ? "No event context — go back and select an event"
+            : camState === "active"
+            ? "Point camera at a ticket QR code — detection is automatic"
             : camState === "denied"
-            ? "Grant camera permission, then retry"
-            : camState === "requesting"
-            ? "Waiting for camera permission…"
-            : "Use demo buttons to simulate a scan"}
+            ? "Grant camera permission and retry"
+            : "Camera unavailable"}
         </p>
-
-        {/* Main scan button — cycles demo outcomes */}
-        <button
-          type="button"
-          onClick={handleScanButton}
-          disabled={scanMutation.isPending}
-          aria-label="Scan QR code"
-          className="flex items-center justify-center gap-2 w-full max-w-70 h-13 rounded-xl bg-brand-orange text-white font-display font-bold text-[16px] hover:bg-brand-orange-hover disabled:opacity-60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
-        >
-          {scanMutation.isPending ? (
-            <>
-              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-              </svg>
-              Validating…
-            </>
-          ) : (
-            <>
-              <Icon name="ScanLine" size={20} />
-              Scan QR
-            </>
-          )}
-        </button>
-
       </div>
 
-      {/* ── Menu dropdown ── */}
+      {/* ── Mobile dropdown menu ── */}
       {menuOpen && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} aria-hidden="true" />
-          <div className="absolute top-12 right-2 z-40 w-52 bg-surface border border-border rounded-lg shadow-pop overflow-hidden">
+          <div className="absolute top-12 right-2 z-40 w-52 bg-surface border border-border rounded-xl shadow-pop overflow-hidden md:hidden">
             {[
-              { icon: "Wallet"    as const, label: "Manual cash entry",  action: () => router.push(cashEntryUrl) },
-              { icon: "RefreshCw" as const, label: "Sync offline scans", action: () => { setSheetOpen(true); setMenuOpen(false); } },
-              { icon: "House"     as const, label: "Back to home",       action: () => router.push(ROUTES.HOME) },
-              { icon: "LogOut"    as const, label: "Sign out",           action: () => signOut({ redirect: true, callbackUrl: "/login" }) },
+              { icon: "Wallet"  as const, label: "Cash entry", action: () => router.push(cashEntryUrl) },
+              { icon: "House"   as const, label: "Home",        action: () => router.push(ROUTES.HOME)  },
+              { icon: "LogOut"  as const, label: "Sign out",    action: () => signOut({ redirect: true, callbackUrl: "/login" }) },
             ].map((item, i) => (
               <button
                 key={item.label}
                 type="button"
                 onClick={() => { setMenuOpen(false); item.action(); }}
-                aria-label={item.label}
                 className={cn(
-                  "flex items-center gap-3 w-full px-4 py-3.5 text-left text-[15px] font-medium text-text hover:bg-surface-bg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange",
+                  "flex items-center gap-3 w-full px-4 py-3.5 text-left text-[15px] font-medium text-text hover:bg-surface-bg transition-colors",
                   i > 0 && "border-t border-border",
                 )}
               >
@@ -614,19 +517,12 @@ export default function ScannerPage() {
         </>
       )}
 
-      {/* ── Offline Sync Sheet (G8) ── */}
-      {sheetOpen && (
-        <OfflineSyncSheet
-          online={online}
-          onRestore={() => setOnline(true)}
-          onClose={() => setSheetOpen(false)}
-        />
-      )}
+      {/* ── Scanning progress overlay ── */}
+      {scanning && <ScanningOverlay />}
 
       {/* ── Result overlay ── */}
       {result && <ResultOverlay result={result} onReset={handleReset} />}
 
-      {/* Scan line keyframe */}
       <style>{`
         @keyframes scanline {
           from { top: 6px; }

@@ -43,7 +43,7 @@ export interface CreateAgentInput {
 // ── Hooks ─────────────────────────────────────────────────────────────────────
 
 /**
- * GET /api/agents — fetch gate agents for this organizer.
+ * GET /api/agents — fetch gate agents, returned as adapted GateAgentType[] for organizer UI.
  */
 export function useAgents(params: UseAgentsParams = {}) {
   return useQuery<GateAgentType[]>({
@@ -59,6 +59,27 @@ export function useAgents(params: UseAgentsParams = {}) {
       const url = qs ? `/agents?${qs}` : "/agents";
       const res = await apiClient.get<ApiResponse<ApiGateAgent[]>>(url);
       return res.data.data.map(adaptAgent);
+    },
+  });
+}
+
+/**
+ * GET /api/agents — returns raw ApiGateAgent[] (for gate agent's own event selector).
+ */
+export function useRawAgents(params: UseAgentsParams = {}) {
+  return useQuery<ApiGateAgent[]>({
+    queryKey: ["agents-raw", params] as const,
+    queryFn:  async () => {
+      const sp = new URLSearchParams();
+      if (params.eventId) sp.set("eventId", params.eventId);
+      if (params.status)  sp.set("status",  params.status);
+      if (params.page)    sp.set("page",    String(params.page));
+      if (params.limit)   sp.set("limit",   String(params.limit));
+
+      const qs  = sp.toString();
+      const url = qs ? `/agents?${qs}` : "/agents";
+      const res = await apiClient.get<ApiResponse<ApiGateAgent[]>>(url);
+      return res.data.data;
     },
   });
 }

@@ -74,6 +74,7 @@ export interface ApiEvent {
 export interface ApiTicket {
   id: string;
   ticketRef: string;     // "TIX-XXXX-XXXX"
+  qrPayload: string;     // "ticketRef:eventId:userId" — encoded in the QR image
   eventId: string;
   bookingId: string;
   tierId: string;

@@ -2,11 +2,11 @@ import QRCode from "qrcode";
 
 /**
  * Generate a data URL for a ticket QR code.
- * Uses navy (#08283B) modules on white (#FFFFFF) background.
- * Size 240px, high error correction (H).
+ * Encodes the qrPayload string (format: "ticketRef:eventId:userId")
+ * that the scan API parses — NOT the DB document id.
  */
-export async function generateTicketQR(ticketId: string): Promise<string> {
-  return QRCode.toDataURL(ticketId, {
+export async function generateTicketQR(qrPayload: string): Promise<string> {
+  return QRCode.toDataURL(qrPayload, {
     errorCorrectionLevel: "H",
     margin: 2,
     color: {
