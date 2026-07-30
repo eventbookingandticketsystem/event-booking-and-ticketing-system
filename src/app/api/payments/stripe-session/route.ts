@@ -52,16 +52,6 @@ export async function POST(req: NextRequest) {
       quantity: line.qty,
     }));
 
-    // Service fee line item
-    lineItems.push({
-      price_data: {
-        currency: "usd",
-        unit_amount: Math.round(booking.serviceFee * 100),
-        product_data: { name: "Service fee" },
-      },
-      quantity: 1,
-    });
-
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: lineItems,

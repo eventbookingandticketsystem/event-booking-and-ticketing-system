@@ -13,7 +13,7 @@ import {
 import { createBookingSchema } from "@/lib/validation/booking.schemas";
 import { Prisma } from "@prisma/client";
 
-const SERVICE_FEE = 1; // $1 fixed service fee
+const SERVICE_FEE = 0;
 
 // ── GET /api/bookings ──────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {

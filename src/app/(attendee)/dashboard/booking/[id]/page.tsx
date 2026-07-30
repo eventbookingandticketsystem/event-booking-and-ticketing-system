@@ -18,7 +18,7 @@ interface BookingLine extends TicketTier {
   qty: number;
 }
 
-const SERVICE_FEE = 1;
+const SERVICE_FEE = 0;
 
 // Rwanda phone prefixes accepted by PayPack
 const RWANDA_PREFIXES = ["078", "079", "075", "072", "073"];
@@ -26,8 +26,8 @@ const RWANDA_PREFIXES = ["078", "079", "075", "072", "073"];
 function normalizeRwandaPhone(raw: string): string | null {
   const digits = raw.replace(/\D/g, "");
   let local = digits;
-  if (local.startsWith("2507"))      local = "0" + local.slice(3);
-  else if (local.startsWith("250"))  local = "0" + local.slice(3);
+  if (local.startsWith("2507")) local = "0" + local.slice(3);
+  else if (local.startsWith("250")) local = "0" + local.slice(3);
   else if (local.length === 9 && !local.startsWith("0")) local = "0" + local;
   // Match PayPack's own regex: 078/079/075/073/072
   if (!/^07[235789]\d{7}$/.test(local)) return null;
@@ -52,7 +52,9 @@ export default function BookingPage({ params }: PageProps) {
     try {
       const raw = sessionStorage.getItem(`tiketi-booking-${id}`);
       if (raw) return JSON.parse(raw) as BookingLine[];
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return null;
   });
 
@@ -76,19 +78,21 @@ export default function BookingPage({ params }: PageProps) {
   // Derive the lines to display — no setState in any effect.
   // Priority: storedLines (from session) > event first-tier default + user overrides.
   const lines: BookingLine[] = storedLines
-    ? storedLines.map((l) =>
-        l.id in qtyOverrides ? { ...l, qty: qtyOverrides[l.id] } : l
-      ).filter((l) => l.qty > 0)
-    : ev
-    ? ev.tiers
-        .filter((t) => !t.soldOut && t.remaining > 0)
-        .slice(0, 1)                                       // default: first available tier
-        .map((t) => ({
-          ...t,
-          qty: qtyOverrides[t.id] ?? 1,
-        }))
+    ? storedLines
+        .map((l) =>
+          l.id in qtyOverrides ? { ...l, qty: qtyOverrides[l.id] } : l,
+        )
         .filter((l) => l.qty > 0)
-    : [];
+    : ev
+      ? ev.tiers
+          .filter((t) => !t.soldOut && t.remaining > 0)
+          .slice(0, 1) // default: first available tier
+          .map((t) => ({
+            ...t,
+            qty: qtyOverrides[t.id] ?? 1,
+          }))
+          .filter((l) => l.qty > 0)
+      : [];
 
   // Focus phone input when modal opens
   useEffect(() => {
@@ -108,7 +112,8 @@ export default function BookingPage({ params }: PageProps) {
   const subtotal = lines.reduce((s, l) => s + l.qty * l.price, 0);
   const total = subtotal + SERVICE_FEE;
 
-  const apiMethod = method === "mtn" ? "MTN" : method === "airtel" ? "AIRTEL" : "CARD";
+  const apiMethod =
+    method === "mtn" ? "MTN" : method === "airtel" ? "AIRTEL" : "CARD";
 
   // Step 1: create the booking, then open the phone modal
   const handleConfirm = async () => {
@@ -127,7 +132,7 @@ export default function BookingPage({ params }: PageProps) {
         sessionStorage.setItem("tiketi-booking-ref", booking.ref);
         sessionStorage.setItem("tiketi-method", method);
         sessionStorage.setItem("tiketi-total", String(booking.total));
-        sessionStorage.setItem("tiketi-event-id", id);  // event ID for "Try again"
+        sessionStorage.setItem("tiketi-event-id", id); // event ID for "Try again"
         sessionStorage.setItem(
           "tiketi-event-title",
           booking.event?.title ?? ev.title,
@@ -146,9 +151,12 @@ export default function BookingPage({ params }: PageProps) {
 
       if (method === "card") {
         // Stripe — create a checkout session and redirect
-        const res = await apiClient.post<{ data: { url: string } }>("/payments/stripe-session", {
-          bookingId: booking.id,
-        });
+        const res = await apiClient.post<{ data: { url: string } }>(
+          "/payments/stripe-session",
+          {
+            bookingId: booking.id,
+          },
+        );
         const url = res.data.data.url;
         if (url) window.location.href = url;
         return;
@@ -202,7 +210,12 @@ export default function BookingPage({ params }: PageProps) {
     setCashinError("");
   };
 
-  const methodLabel = method === "mtn" ? "MTN Mobile Money" : method === "airtel" ? "Airtel Money" : "Credit / Debit Card";
+  const methodLabel =
+    method === "mtn"
+      ? "MTN Mobile Money"
+      : method === "airtel"
+        ? "Airtel Money"
+        : "Credit / Debit Card";
 
   // ── Loading skeleton ─────────────────────────────────────────────────────────
   if (evLoading) {
@@ -367,15 +380,6 @@ export default function BookingPage({ params }: PageProps) {
                 </div>
               ))}
 
-              <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-border/50">
-                <div className="text-sm font-medium text-text-secondary">
-                  Service fee
-                </div>
-                <div className="font-display font-semibold text-sm">
-                  {formatSSP(SERVICE_FEE)}
-                </div>
-              </div>
-
               <div className="flex items-center justify-between px-4 py-[15px] bg-surface-bg border-t border-border">
                 <span className="text-sm font-semibold">Total</span>
                 <span className="font-display font-bold text-[20px]">
@@ -391,9 +395,27 @@ export default function BookingPage({ params }: PageProps) {
             <div className="flex flex-col gap-3">
               {(
                 [
-                  { id: "mtn",    label: "MTN Mobile Money", color: "#FFCC00", textColor: "#000", abbr: "MTN" },
-                  { id: "airtel", label: "Airtel Money",      color: "#FF0000", textColor: "#fff", abbr: "Airtel" },
-                  { id: "card",   label: "Credit / Debit Card (Stripe)", color: "#635BFF", textColor: "#fff", abbr: "Card" },
+                  {
+                    id: "mtn",
+                    label: "MTN Mobile Money",
+                    color: "#FFCC00",
+                    textColor: "#000",
+                    abbr: "MTN",
+                  },
+                  {
+                    id: "airtel",
+                    label: "Airtel Money",
+                    color: "#FF0000",
+                    textColor: "#fff",
+                    abbr: "Airtel",
+                  },
+                  {
+                    id: "card",
+                    label: "Credit / Debit Card",
+                    color: "#635BFF",
+                    textColor: "#fff",
+                    abbr: "Card",
+                  },
                 ] as const
               ).map((opt) => (
                 <label
@@ -425,7 +447,9 @@ export default function BookingPage({ params }: PageProps) {
                   <span
                     className={cn(
                       "w-5 h-5 rounded-full border-2 shrink-0 inline-flex items-center justify-center",
-                      method === opt.id ? "border-brand-orange" : "border-border",
+                      method === opt.id
+                        ? "border-brand-orange"
+                        : "border-border",
                     )}
                   >
                     {method === opt.id && (
