@@ -158,7 +158,7 @@ export default function BookingPage({ params }: PageProps) {
           },
         );
         const url = res.data.data.url;
-        if (url) window.location.href = url;
+        if (url) window.location.assign(url);
         return;
       }
 
