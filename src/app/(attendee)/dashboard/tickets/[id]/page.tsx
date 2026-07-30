@@ -25,7 +25,7 @@ export default function QRViewPage({ params }: PageProps) {
   // Generate QR when ticket data arrives
   useEffect(() => {
     if (!ticket) return;
-    generateTicketQR(ticket.qrPayload ?? ticket.id)
+    generateTicketQR(ticket.qrPayload)
       .then((src) => setQrSrc(src))
       .catch(() => setQrSrc(null));
   }, [ticket?.id]);

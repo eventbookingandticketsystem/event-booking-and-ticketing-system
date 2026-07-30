@@ -16,9 +16,10 @@ export interface TicketEventSummary {
 }
 
 export interface TicketType {
-  id: string;        // "TIX-7K2M-9QX4"
-  eventId: string;   // references EventType.id
-  tier: string;      // tier name, e.g. "VIP"
+  id: string;         // "TIX-7K2M-9QX4"
+  qrPayload: string;  // "ticketRef:eventId:userId" — what the QR code encodes
+  eventId: string;    // references EventType.id
+  tier: string;       // tier name, e.g. "VIP"
   status: TicketStatus;
   when: TicketWhen;
   /** Embedded event summary from the API — populated by adaptTicket(). */

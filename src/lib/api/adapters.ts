@@ -88,12 +88,13 @@ export function adaptTicket(t: ApiTicket): TicketType {
   };
 
   return {
-    id:      t.ticketRef,
-    eventId: t.eventId,
-    tier:    t.tier,
-    status:  apiStatusToUI(t.status),
-    when:    ticketWhen(t),
-    event:   eventSummary,
+    id:         t.ticketRef,
+    qrPayload:  t.qrPayload,
+    eventId:    t.eventId,
+    tier:       t.tier,
+    status:     apiStatusToUI(t.status),
+    when:       ticketWhen(t),
+    event:      eventSummary,
   };
 }
 
