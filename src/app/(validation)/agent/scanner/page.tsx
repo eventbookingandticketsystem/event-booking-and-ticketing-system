@@ -30,13 +30,16 @@ function outcomeToResult(o: ScanOutcome): ScanResult {
   switch (o.result) {
     case "ADMIT":
       return { kind: "admit", name: o.attendee, tier: o.tier };
-    case "ALREADY_USED":
-      return {
-        kind: "used",
-        sub: o.usedAt
-          ? `First scanned at ${new Date(o.usedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`
-          : "Ticket has already been scanned",
-      };
+    case "ALREADY_USED": {
+      let usedAtStr = "Ticket has already been scanned";
+      if (o.usedAt) {
+        const d = new Date(o.usedAt);
+        if (!isNaN(d.getTime())) {
+          usedAtStr = `First scanned at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+        }
+      }
+      return { kind: "used", sub: usedAtStr };
+    }
     case "EXPIRED":
       return { kind: "expired", sub: o.message };
     case "WRONG_EVENT":

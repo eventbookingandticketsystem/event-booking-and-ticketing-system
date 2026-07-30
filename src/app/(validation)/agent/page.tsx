@@ -16,11 +16,13 @@ type Phase = "ready" | "downloading" | "failed";
 
 function fmtDate(iso: string) {
   try {
-    return new Date(iso).toLocaleDateString("en-GB", {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso ?? "—";
+    return d.toLocaleDateString("en-GB", {
       weekday: "short", day: "numeric", month: "short", year: "numeric",
     });
   } catch {
-    return iso;
+    return iso ?? "—";
   }
 }
 
