@@ -8,7 +8,7 @@ export const bookingLineSchema = z.object({
 export const createBookingSchema = z.object({
   eventId: z.string().min(1),
   lines:   z.array(bookingLineSchema).min(1, "At least one tier is required"),
-  method:  z.enum(["MTN", "AIRTEL", "CASH"]),
+  method:  z.enum(["MTN", "AIRTEL", "CASH", "CARD"]),
 });
 
 export const updateBookingSchema = z.object({
