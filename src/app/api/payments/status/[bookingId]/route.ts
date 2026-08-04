@@ -3,8 +3,13 @@ import { getToken } from "next-auth/jwt";
 import PaypackModule from "paypack-js";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Paypack = (PaypackModule as any).default ?? PaypackModule;
+import Stripe from "stripe";
 import prisma from "../../../../../../prisma/client";
 import { ok, forbidden, notFound, serverError } from "@/lib/api-utils";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2026-07-29.dahlia",
+});
 
 // GET /api/payments/status/[bookingId]
 // Returns the current booking status. When the booking is PENDING and has a
@@ -38,7 +43,7 @@ export async function GET(
     if (booking.userId !== (token.id as string)) return forbidden("Access denied");
 
     // If already settled, return immediately
-    if (booking.status !== "PENDING" || !booking.paypackRef) {
+    if (booking.status !== "PENDING") {
       return ok({
         id: booking.id,
         ref: booking.ref,
@@ -48,22 +53,45 @@ export async function GET(
       });
     }
 
-    // Still PENDING — query PayPack for the live transaction status
+    if (!booking.paypackRef) {
+      // No payment ref yet — still waiting
+      return ok({ id: booking.id, ref: booking.ref, status: "PENDING", paidAt: null, total: booking.total });
+    }
+
+    // Detect Stripe vs PayPack by the ref prefix
+    const isStripe = booking.paypackRef.startsWith("cs_");
+
     let liveStatus = "PENDING";
-    try {
-      const paypack = new Paypack({
-        client_id: process.env.PAYPACK_APPLICATION_ID!,
-        client_secret: process.env.PAYPACK_APPLICATION_SECRET!,
-      });
-      const txResult = await paypack.transaction(booking.paypackRef);
-      liveStatus = (txResult?.data?.status ?? "PENDING").toUpperCase();
-      console.log("[status] PayPack tx:", booking.paypackRef, "→", liveStatus);
-    } catch (paypackErr: unknown) {
-      const msg = (paypackErr as { message?: string })?.message ?? "";
-      console.warn("[status] PayPack query failed:", msg);
-      // If transaction not found, treat as failed
-      if (msg.toLowerCase().includes("not found")) liveStatus = "FAILED";
-      // Otherwise keep PENDING (PayPack unreachable — don't penalise the user)
+
+    if (isStripe) {
+      // Check Stripe Checkout Session status
+      try {
+        const session = await stripe.checkout.sessions.retrieve(booking.paypackRef);
+        console.log("[status] Stripe session:", session.id, "→ payment_status:", session.payment_status, "status:", session.status);
+        if (session.payment_status === "paid") {
+          liveStatus = "SUCCESSFUL";
+        } else if (session.status === "expired") {
+          liveStatus = "FAILED";
+        }
+        // "open" = still in checkout → keep PENDING
+      } catch (stripeErr: unknown) {
+        console.warn("[status] Stripe session query failed:", (stripeErr as { message?: string })?.message);
+      }
+    } else {
+      // PayPack path
+      try {
+        const paypack = new Paypack({
+          client_id: process.env.PAYPACK_APPLICATION_ID!,
+          client_secret: process.env.PAYPACK_APPLICATION_SECRET!,
+        });
+        const txResult = await paypack.transaction(booking.paypackRef);
+        liveStatus = (txResult?.data?.status ?? "PENDING").toUpperCase();
+        console.log("[status] PayPack tx:", booking.paypackRef, "→", liveStatus);
+      } catch (paypackErr: unknown) {
+        const msg = (paypackErr as { message?: string })?.message ?? "";
+        console.warn("[status] PayPack query failed:", msg);
+        if (msg.toLowerCase().includes("not found")) liveStatus = "FAILED";
+      }
     }
 
     if (liveStatus === "SUCCESSFUL") {

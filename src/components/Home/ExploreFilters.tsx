@@ -5,33 +5,22 @@ import { Icon } from "@/components/Shared/Icon";
 import { cn } from "@/lib/utils";
 import { EXPLORE_CITIES } from "@/lib/mock-data";
 
-interface TimeOption {
-  id: string;
-  label: string;
-}
-
 interface ExploreFiltersProps {
   categories: string[];
-  times: TimeOption[];
   activeCategory: string;
-  activeTime: string;
   city: string;
   search: string;
   onCategory: (cat: string) => void;
-  onTime: (time: string) => void;
   onCity: (city: string) => void;
   onSearch: (q: string) => void;
 }
 
 export function ExploreFilters({
   categories,
-  times,
   activeCategory,
-  activeTime,
   city,
   search,
   onCategory,
-  onTime,
   onCity,
   onSearch,
 }: ExploreFiltersProps) {
@@ -50,7 +39,7 @@ export function ExploreFilters({
     return () => document.removeEventListener("mousedown", handler);
   }, [cityOpen]);
 
-  const anyFilter = activeCategory !== "All" || activeTime !== "" || search.trim() !== "";
+  const anyFilter = activeCategory !== "All" || search.trim() !== "";
 
   return (
     <div
@@ -154,48 +143,6 @@ export function ExploreFilters({
         })}
       </div>
 
-      {/* Row 3: time chips + date sort */}
-      <div className="flex items-center gap-4 mt-3 max-w-[1180px] mx-auto max-sm:flex-col max-sm:items-stretch">
-        <div
-          className="flex flex-1 gap-[9px] overflow-x-auto scrollbar-none pb-0.5"
-          style={{ scrollbarWidth: "none" }}
-          role="group"
-          aria-label="Filter by time"
-        >
-          {times.map((t) => {
-            const isOn = activeTime === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => onTime(isOn ? "" : t.id)}
-                aria-pressed={isOn}
-                className={cn(
-                  "flex-none h-9 px-4 rounded-pill text-[13px] font-semibold whitespace-nowrap transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange",
-                  isOn
-                    ? "bg-brand-orange border border-brand-orange text-white"
-                    : "bg-transparent text-white/50 hover:text-white hover:border-white/32",
-                )}
-                style={!isOn ? { border: "1px solid rgba(255,255,255,0.16)" } : undefined}
-              >
-                {t.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Date sort toggle */}
-        <button
-          type="button"
-          aria-label="Sort by date"
-          className="flex-none inline-flex items-center gap-[7px] h-9 px-3.5 rounded-pill text-[13px] font-semibold text-white/50 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
-          style={{ border: "1px solid rgba(255,255,255,0.16)" }}
-        >
-          <Icon name="Calendar" size={15} />
-          Date
-          <Icon name="ArrowDown" size={14} />
-        </button>
-      </div>
 
       {/* Clear filters */}
       {anyFilter && (
@@ -204,7 +151,6 @@ export function ExploreFilters({
             type="button"
             onClick={() => {
               onCategory("All");
-              onTime("");
               onSearch("");
             }}
             className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand-orange hover:text-brand-orange-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange rounded"

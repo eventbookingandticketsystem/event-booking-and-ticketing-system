@@ -36,12 +36,6 @@ function toTimeKeys(dateIso: string, status: ExploreStatus): string[] {
   const eventDate = new Date(dateIso);
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-  const weekEnd = new Date(today);
-  weekEnd.setDate(today.getDate() + 7);
-  const monthEnd = new Date(today);
-  monthEnd.setDate(today.getDate() + 30);
 
   const evDay = new Date(
     eventDate.getFullYear(),
@@ -49,10 +43,35 @@ function toTimeKeys(dateIso: string, status: ExploreStatus): string[] {
     eventDate.getDate(),
   );
 
-  if (evDay.getTime() === today.getTime()) keys.push("today");
+  // Today — includes happening-now events
+  if (evDay.getTime() === today.getTime() || status === "happening-now") {
+    keys.push("today");
+  }
+
+  // Tomorrow
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
   if (evDay.getTime() === tomorrow.getTime()) keys.push("tomorrow");
-  if (evDay >= today && evDay <= weekEnd) keys.push("weekend");
-  if (evDay >= today && evDay <= monthEnd) keys.push("month");
+
+  // This Weekend — Saturday and Sunday of the current week
+  const dayOfWeek = today.getDay(); // 0=Sun, 6=Sat
+  const daysToSat = dayOfWeek === 6 ? 0 : (6 - dayOfWeek);
+  const thisSat = new Date(today);
+  thisSat.setDate(today.getDate() + daysToSat);
+  const thisSun = new Date(thisSat);
+  thisSun.setDate(thisSat.getDate() + 1);
+  if (evDay.getTime() === thisSat.getTime() || evDay.getTime() === thisSun.getTime()) {
+    keys.push("weekend");
+  }
+
+  // This Month — same calendar month and year
+  if (
+    evDay.getFullYear() === today.getFullYear() &&
+    evDay.getMonth() === today.getMonth() &&
+    evDay >= today
+  ) {
+    keys.push("month");
+  }
 
   return keys;
 }

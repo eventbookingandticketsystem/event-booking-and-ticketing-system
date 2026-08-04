@@ -9,10 +9,6 @@ import { ExploreCard } from "@/components/Shared/ExploreCard";
 import { EmptyState } from "@/components/Shared/EmptyState";
 import { Button } from "@/components/Shared/Button";
 import { Icon } from "@/components/Shared/Icon";
-import {
-  EXPLORE_CATEGORIES,
-  EXPLORE_TIMES,
-} from "@/lib/mock-data";
 import { ROUTES } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 import { useExploreEvents } from "@/lib/api/hooks/useExploreEvents";
@@ -37,7 +33,6 @@ export default function ExplorePage() {
   const { data: session } = useSession();
 
   const [activeCategory, setActiveCategory] = useState("All");
-  const [activeTime,     setActiveTime]     = useState("");
   const [city,           setCity]           = useState("All Cities");
   const [search,         setSearch]         = useState("");
 
@@ -50,19 +45,32 @@ export default function ExplorePage() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [search]);
 
+  // Fetch all events (no category filter) to derive available categories
+  const { data: allEvents = [] } = useExploreEvents({
+    search: debouncedSearch || undefined,
+    city:   city !== "All Cities" ? city : undefined,
+    limit:  200,
+  });
+
+  // Derive categories from real events, sorted by count descending
+  const availableCategories = ["All", ...Array.from(
+    allEvents.reduce((map, ev) => {
+      map.set(ev.category, (map.get(ev.category) ?? 0) + 1);
+      return map;
+    }, new Map<string, number>())
+  )
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat]) => cat)
+  ];
+
   const { data: events = [], isLoading, isError } = useExploreEvents({
     category:   activeCategory !== "All" ? activeCategory : undefined,
     search:     debouncedSearch || undefined,
     city:       city !== "All Cities" ? city : undefined,
   });
 
-  // Client-side time filter (can't express date-range on the API)
-  const filtered = activeTime
-    ? events.filter((ev) => ev.times.includes(activeTime))
-    : events;
-
-  const happeningNow = filtered.filter((e) => e.status === "happening-now");
-  const upcoming     = filtered.filter((e) => e.status !== "happening-now");
+  const happeningNow = events.filter((e) => e.status === "happening-now");
+  const upcoming     = events.filter((e) => e.status !== "happening-now");
 
   const handleOpenEvent = (id: string) => router.push(ROUTES.EXPLORE_EVENT(id));
   const handleSignIn    = () => router.push(ROUTES.LOGIN);
@@ -71,7 +79,6 @@ export default function ExplorePage() {
 
   const clearFilters = () => {
     setActiveCategory("All");
-    setActiveTime("");
     setSearch("");
   };
 
@@ -86,14 +93,11 @@ export default function ExplorePage() {
       />
 
       <ExploreFilters
-        categories={EXPLORE_CATEGORIES}
-        times={EXPLORE_TIMES}
+        categories={availableCategories}
         activeCategory={activeCategory}
-        activeTime={activeTime}
         city={city}
         search={search}
         onCategory={setActiveCategory}
-        onTime={setActiveTime}
         onCity={setCity}
         onSearch={setSearch}
       />
@@ -155,7 +159,7 @@ export default function ExplorePage() {
         )}
 
         {/* Empty state */}
-        {!isLoading && !isError && filtered.length === 0 && (
+        {!isLoading && !isError && events.length === 0 && (
           <div
             className="max-w-130 mx-auto mt-10 rounded-xl p-8 text-center"
             style={{ background: "rgba(14,28,41,0.9)", border: "1px solid rgba(255,255,255,0.08)" }}
@@ -175,7 +179,7 @@ export default function ExplorePage() {
         )}
 
         {/* Loaded */}
-        {!isLoading && !isError && filtered.length > 0 && (
+        {!isLoading && !isError && events.length > 0 && (
           <>
             {/* Active / Happening Now */}
             {happeningNow.length > 0 && (

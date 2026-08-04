@@ -197,13 +197,13 @@ async function main() {
   // ── 4. Events ───────────────────────────────────────────────────────────
   const eventDefs = [
     {
-      title: "Juba Music Festival 2025",
+      title: "Juba Music Festival 2026",
       category: "Concert",
       poster: POSTERS.concert,
       image: "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=600&q=80",
       organizer: "Nile Live Events",
       orgProfile: orgProfiles[0],
-      date: new Date("2025-12-14T18:00:00Z"),
+      date: new Date("2026-08-09T18:00:00Z"),
       time: "6:00 PM – 11:00 PM",
       venue: "Nyakuron Cultural Centre",
       city: "Juba",
@@ -228,12 +228,12 @@ async function main() {
       image: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=600&q=80",
       organizer: "SSFA",
       orgProfile: orgProfiles[1],
-      date: new Date("2025-12-22T16:00:00Z"),
+      date: new Date("2026-08-16T16:00:00Z"),
       time: "4:00 PM kick-off",
       venue: "Juba National Stadium",
       city: "Juba",
       about: "The title decider. Defending champions face the league's top scorers in a sold-out showdown. Turnstiles open two hours before kick-off.",
-      status: "UPCOMING",
+      status: "PUBLISHED",
       featured: false,
       tiers: [
         { name: "VIP Stand", price: 20, capacity: 600, remaining: 88, lowStock: false, soldOut: false },
@@ -242,18 +242,18 @@ async function main() {
       entryRate: [],
     },
     {
-      title: "University of Juba Graduation 2025",
+      title: "University of Juba Graduation 2026",
       category: "Graduation",
       poster: POSTERS.graduation,
       image: "https://images.unsplash.com/photo-1627556704302-624286467c65?w=600&q=80",
       organizer: "University of Juba",
       orgProfile: orgProfiles[2],
-      date: new Date("2025-12-05T09:00:00Z"),
+      date: new Date("2026-08-22T09:00:00Z"),
       time: "9:00 AM",
       venue: "Freedom Hall",
       city: "Juba",
-      about: "The 2025 commencement ceremony for the graduating class. Each graduand is allocated guest tickets. Doors close promptly at 8:45 AM.",
-      status: "COMPLETED",
+      about: "The 2026 commencement ceremony for the graduating class. Each graduand is allocated guest tickets. Doors close promptly at 8:45 AM.",
+      status: "PUBLISHED",
       featured: false,
       tiers: [
         { name: "Family Guest", price: 4, capacity: 1200, remaining: 140, lowStock: false, soldOut: false },
@@ -270,12 +270,12 @@ async function main() {
       image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&q=80",
       organizer: "RwandanTechEvents",
       orgProfile: orgProfiles[3],
-      date: new Date("2025-12-17T08:30:00Z"),
+      date: new Date("2026-09-05T08:30:00Z"),
       time: "8:30 AM – 5:00 PM",
       venue: "Crown Hotel",
       city: "Juba",
       about: "A full-day gathering of founders, developers, and policymakers shaping South Sudan's digital economy. Includes lunch and a networking reception.",
-      status: "UPCOMING",
+      status: "PUBLISHED",
       featured: false,
       tiers: [
         { name: "Delegate", price: 25, capacity: 300, remaining: 47, lowStock: false, soldOut: false },
@@ -290,12 +290,12 @@ async function main() {
       image: "https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=600&q=80",
       organizer: "Grace Arena",
       orgProfile: orgProfiles[4],
-      date: new Date("2025-12-28T17:00:00Z"),
+      date: new Date("2026-08-30T17:00:00Z"),
       time: "5:00 PM",
       venue: "Dr. John Garang Mausoleum Grounds",
       city: "Juba",
       about: "An evening of worship and live gospel music under the Juba sky, featuring choirs from across the region.",
-      status: "DRAFT",
+      status: "PUBLISHED",
       featured: false,
       tiers: [
         { name: "General", price: 5, capacity: 3000, remaining: 1820, lowStock: false, soldOut: false },
@@ -421,7 +421,7 @@ async function main() {
     if (existingTicket) continue;
 
     const subtotal = bd.unitPrice;
-    const total = subtotal + 1;
+    const total = subtotal;
 
     const booking = await prisma.booking.upsert({
       where: { ref: bd.ref },
@@ -432,10 +432,10 @@ async function main() {
         eventId: bd.event.id,
         method: bd.method,
         subtotal,
-        serviceFee: 1,
+        serviceFee: 0,
         total,
         status: "CONFIRMED",
-        paidAt: new Date("2025-11-15T10:00:00Z"),
+        paidAt: new Date("2026-07-15T10:00:00Z"),
         lines: {
           create: {
             tierId: bd.tier.id,
@@ -452,12 +452,12 @@ async function main() {
         ticketRef: bd.ticketRef,
         tier: bd.tierName,
         status: bd.ticketStatus,
-        qrPayload: `tiketi:${bd.ticketRef}:${bd.event.id}:${bd.tier.id}`,
+        qrPayload: `${bd.ticketRef}:${bd.event.id}:${attendee.id}`,
         ownerId: attendee.id,
         eventId: bd.event.id,
         bookingId: booking.id,
         tierId: bd.tier.id,
-        usedAt: bd.ticketStatus === "USED" ? new Date("2025-12-05T09:30:00Z") : null,
+        usedAt: bd.ticketStatus === "USED" ? new Date("2026-07-20T09:30:00Z") : null,
       },
     });
   }

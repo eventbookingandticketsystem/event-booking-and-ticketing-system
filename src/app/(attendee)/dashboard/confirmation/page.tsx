@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/Shared/Button";
 import { AlertBanner } from "@/components/Shared/AlertBanner";
 import { Icon } from "@/components/Shared/Icon";
@@ -9,18 +9,44 @@ import { formatSSP, formatDate } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
 import apiClient from "@/lib/api/client";
 
+interface BookingContext {
+  bookingRef:  string;
+  total:       number;
+  eventTitle:  string;
+  eventDate:   string;
+  ticketCount: string;
+}
+
 export default function ConfirmationPage() {
-  const router = useRouter();
+  const router       = useRouter();
   const searchParams = useSearchParams();
 
-  // When Stripe redirects back with ?session_id=..., poll until the webhook
-  // has confirmed the booking, then clear the param.
+  const [ctx, setCtx] = useState<BookingContext>({
+    bookingRef:  "—",
+    total:       0,
+    eventTitle:  "—",
+    eventDate:   "",
+    ticketCount: "1",
+  });
+
+  // Read sessionStorage only on the client to avoid hydration mismatch
+  useEffect(() => {
+    setCtx({
+      bookingRef:  sessionStorage.getItem("tiketi-booking-ref")   ?? "—",
+      total:       Number(sessionStorage.getItem("tiketi-total")  ?? 0),
+      eventTitle:  sessionStorage.getItem("tiketi-event-title")   ?? "—",
+      eventDate:   sessionStorage.getItem("tiketi-event-date")    ?? "",
+      ticketCount: sessionStorage.getItem("tiketi-ticket-count")  ?? "1",
+    });
+  }, []);
+
+  // When Stripe redirects back with ?session_id=..., poll until confirmed
   useEffect(() => {
     const sessionId = searchParams.get("session_id");
-    const bookingId = typeof window !== "undefined"
-      ? sessionStorage.getItem("tiketi-booking-id")
-      : null;
+    const bookingId = sessionStorage.getItem("tiketi-booking-id");
     if (!sessionId || !bookingId) return;
+
+    console.log("[confirmation] polling booking:", bookingId, "stripe session:", sessionId);
 
     let tries = 0;
     const iv = setInterval(async () => {
@@ -29,48 +55,36 @@ export default function ConfirmationPage() {
         const res = await apiClient.get<{ data: { status: string } }>(
           `/payments/status/${encodeURIComponent(bookingId)}`,
         );
-        if (res.data.data.status === "CONFIRMED") {
+        const status = res.data.data.status;
+        console.log("[confirmation] poll", tries, "→ status:", status);
+        if (status === "CONFIRMED") {
           clearInterval(iv);
-          // remove session_id from URL without a page reload
           const url = new URL(window.location.href);
           url.searchParams.delete("session_id");
           window.history.replaceState({}, "", url.toString());
         }
-      } catch { /* keep polling */ }
-      if (tries >= 15) clearInterval(iv); // give up after 45s
+      } catch (e) {
+        console.warn("[confirmation] poll error:", e);
+      }
+      if (tries >= 20) {
+        console.warn("[confirmation] gave up polling after", tries, "attempts");
+        clearInterval(iv);
+      }
     }, 3000);
 
     return () => clearInterval(iv);
   }, [searchParams]);
 
-  // Read all booking context persisted by the booking + payment pages
-  const bookingRef   = typeof window !== "undefined"
-    ? sessionStorage.getItem("tiketi-booking-ref")   ?? "—"
-    : "—";
-  const total        = typeof window !== "undefined"
-    ? Number(sessionStorage.getItem("tiketi-total")  ?? 0)
-    : 0;
-  const eventTitle   = typeof window !== "undefined"
-    ? sessionStorage.getItem("tiketi-event-title")   ?? "—"
-    : "—";
-  const eventDate    = typeof window !== "undefined"
-    ? sessionStorage.getItem("tiketi-event-date")    ?? ""
-    : "";
-  const ticketCount  = typeof window !== "undefined"
-    ? sessionStorage.getItem("tiketi-ticket-count")  ?? "1"
-    : "1";
-
-  const displayDate = eventDate ? formatDate(eventDate) : "—";
+  const displayDate = ctx.eventDate ? formatDate(ctx.eventDate) : "—";
 
   const summaryRows = [
-    { k: "Event",   v: eventTitle },
+    { k: "Event",   v: ctx.eventTitle },
     { k: "Date",    v: displayDate },
-    { k: "Tickets", v: ticketCount },
+    { k: "Tickets", v: ctx.ticketCount },
   ];
 
   return (
     <div className="flex-1 overflow-y-auto">
-      {/* Content — centred on desktop */}
       <div className="w-full max-w-2xl mx-auto px-4 md:px-8 pt-9 pb-8">
 
         {/* Success icon */}
@@ -83,7 +97,7 @@ export default function ConfirmationPage() {
           </h1>
           <p className="text-sm text-text-secondary">Your tickets are ready in your wallet.</p>
           <div className="font-mono text-[15px] bg-surface-bg px-3.5 py-2 rounded-sm mt-1.5 tracking-[0.5px]">
-            {bookingRef}
+            {ctx.bookingRef}
           </div>
         </div>
 
@@ -97,11 +111,11 @@ export default function ConfirmationPage() {
           ))}
           <div className="flex items-center justify-between px-4 py-[15px] bg-surface-bg border-t border-border">
             <span className="text-sm font-semibold">Total paid</span>
-            <span className="font-display font-bold text-[20px]">{formatSSP(total)}</span>
+            <span className="font-display font-bold text-[20px]">{formatSSP(ctx.total)}</span>
           </div>
         </div>
 
-        {/* Ticket-link info banner */}
+        {/* Info banner */}
         <AlertBanner
           tone="info"
           title="Ticket link sent"
@@ -111,20 +125,11 @@ export default function ConfirmationPage() {
 
         {/* CTAs */}
         <div className="flex flex-col gap-3">
-          <Button
-            fullWidth
-            size="lg"
-            onClick={() => router.push(ROUTES.TICKETS)}
-            className="gap-2"
-          >
+          <Button fullWidth size="lg" onClick={() => router.push(ROUTES.TICKETS)} className="gap-2">
             <Icon name="Ticket" size={18} />
             View my tickets
           </Button>
-          <Button
-            fullWidth
-            variant="ghost"
-            onClick={() => router.push(ROUTES.DASHBOARD)}
-          >
+          <Button fullWidth variant="ghost" onClick={() => router.push(ROUTES.DASHBOARD)}>
             Back to home
           </Button>
         </div>

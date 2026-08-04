@@ -50,8 +50,15 @@ export async function GET(req: NextRequest) {
       ? (statusParam as Prisma.EnumEventStatusFilter)
       : { notIn: ["DRAFT", "CANCELLED"] };
 
+    // For public listing (no explicit status param) hide events whose date has passed.
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dateWhere: Prisma.EventWhereInput =
+      !statusParam ? { date: { gte: today } } : {};
+
     const where: Prisma.EventWhereInput = {
       status: statusWhere,
+      ...dateWhere,
       ...(category  && { category }),
       ...(featured  && { featured }),
       ...(city      && { city }),

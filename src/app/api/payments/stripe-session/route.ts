@@ -69,6 +69,12 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Store session ID in paypackRef so status polling can check it via Stripe API
+    await prisma.booking.update({
+      where: { id: bookingId },
+      data:  { paypackRef: session.id },
+    });
+
     console.log("[stripe-session] created:", session.id, "for booking:", bookingId);
 
     return ok({ sessionId: session.id, url: session.url });
