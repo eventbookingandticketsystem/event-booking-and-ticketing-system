@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Icon } from "@/components/Shared/Icon";
@@ -250,9 +251,8 @@ export function Navbar({
 
           {/* Brand wordmark + explore chip */}
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onExplore}
+            <Link
+              href="/"
               aria-label="Go to homepage"
               className="flex items-center gap-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange rounded"
             >
@@ -262,7 +262,7 @@ export function Navbar({
               <span className="font-display font-bold text-[22px] tracking-[-0.5px] text-white">
                 Tiketi
               </span>
-            </button>
+            </Link>
 
             <button
               type="button"
@@ -299,15 +299,29 @@ export function Navbar({
             )}
           </nav>
 
-          {/* Mobile hamburger */}
-          <button
-            type="button"
-            className="md:hidden inline-flex items-center justify-center p-1 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange rounded"
-            aria-label="Open menu"
-            onClick={() => setDrawer(true)}
-          >
-            <Icon name="Menu" size={22} />
-          </button>
+          {/* Mobile right side: Explore chip + hamburger */}
+          <div className="md:hidden flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onExplore}
+              aria-current={exploreActive ? "page" : undefined}
+              className={`inline-flex items-center px-3 py-1.5 rounded-pill border text-[12px] font-semibold transition-colors
+                ${exploreActive
+                  ? "bg-brand-orange border-brand-orange text-white"
+                  : "bg-transparent border-brand-orange text-brand-orange hover:bg-brand-orange hover:text-white"
+                }`}
+            >
+              Explore
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center justify-center p-1 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange rounded"
+              aria-label="Open menu"
+              onClick={() => setDrawer(true)}
+            >
+              <Icon name="Menu" size={22} />
+            </button>
+          </div>
         </div>
       </header>
 
