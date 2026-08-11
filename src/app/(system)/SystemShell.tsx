@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { AdminSidebar } from "@/components/Admin/AdminSidebar";
 import { AdminTopbar } from "@/components/Admin/AdminTopbar";
@@ -10,16 +9,25 @@ import { cn } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
 import { type icons } from "lucide-react";
 
-interface NavItem { id: string; label: string; icon: keyof typeof icons; }
+interface NavItem { id: string; label: string; icon: keyof typeof icons; route: string; }
 
 const ADMIN_NAV: NavItem[] = [
-  { id: "overview",   label: "Overview",   icon: "LayoutDashboard" },
-  { id: "organizers", label: "Orgs",       icon: "Building2"       },
-  { id: "events",     label: "Events",     icon: "CalendarDays"    },
-  { id: "gateagents", label: "Agents",     icon: "Users"           },
-  { id: "health",     label: "Health",     icon: "Activity"        },
-  { id: "settings",   label: "Settings",   icon: "Settings"        },
+  { id: "overview",   label: "Overview",     icon: "LayoutDashboard", route: ROUTES.ADMIN             },
+  { id: "organizers", label: "Orgs",         icon: "Building2",       route: ROUTES.ADMIN_ORGANIZERS  },
+  { id: "events",     label: "Events",       icon: "CalendarDays",    route: ROUTES.ADMIN_EVENTS      },
+  { id: "gateagents", label: "Agents",       icon: "Users",           route: ROUTES.ADMIN_GATE_AGENTS },
+  { id: "health",     label: "Health",       icon: "Activity",        route: ROUTES.ADMIN_HEALTH      },
+  { id: "settings",   label: "Settings",     icon: "Settings",        route: ROUTES.ADMIN_SETTINGS    },
 ];
+
+function pathToNav(pathname: string): string {
+  if (pathname.startsWith("/admin/organizers")) return "organizers";
+  if (pathname.startsWith("/admin/events"))     return "events";
+  if (pathname.startsWith("/admin/gate-agents")) return "gateagents";
+  if (pathname.startsWith("/admin/health"))     return "health";
+  if (pathname.startsWith("/admin/settings"))   return "settings";
+  return "overview";
+}
 
 const NAV_LABELS: Record<string, string> = {
   overview: "Overview", organizers: "Organizers", events: "Events",
@@ -71,20 +79,27 @@ function MobileBottomNav({ active, onNav }: { active: string; onNav: (id: string
 }
 
 export default function SystemShell({ children }: { children: React.ReactNode }) {
-  const [nav, setNav] = useState("overview");
-  const crumb = NAV_LABELS[nav] ?? "Overview";
+  const router   = useRouter();
+  const pathname = usePathname();
+  const nav      = pathToNav(pathname);
+  const crumb    = NAV_LABELS[nav] ?? "Overview";
+
+  const handleNav = (id: string) => {
+    const item = ADMIN_NAV.find((n) => n.id === id);
+    if (item) router.push(item.route);
+  };
 
   return (
     <>
       <div className="flex lg:hidden flex-col min-h-screen bg-surface-bg">
         <div className="sticky top-0 z-20"><MobileTopBar label={crumb} /></div>
         <main className="flex-1 overflow-y-auto pb-16">{children}</main>
-        <div className="fixed bottom-0 left-0 right-0 z-30"><MobileBottomNav active={nav} onNav={setNav} /></div>
+        <div className="fixed bottom-0 left-0 right-0 z-30"><MobileBottomNav active={nav} onNav={handleNav} /></div>
       </div>
       <div className="hidden lg:flex h-screen overflow-hidden bg-surface-bg">
-        <AdminSidebar active={nav} onNav={setNav} />
+        <AdminSidebar active={nav} onNav={handleNav} />
         <div className="flex flex-col flex-1 min-w-0 h-screen">
-          <AdminTopbar crumb={crumb} onCrumbRoot={() => setNav("overview")} />
+          <AdminTopbar crumb={crumb} onCrumbRoot={() => router.push(ROUTES.ADMIN)} />
           <main className="flex-1 overflow-y-auto">{children}</main>
         </div>
       </div>
