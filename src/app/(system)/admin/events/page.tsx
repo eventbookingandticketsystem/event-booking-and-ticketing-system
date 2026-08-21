@@ -1,13 +1,16 @@
 'use client';
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { StatusPill } from "@/components/Shared/StatusPill";
 import { EmptyState } from "@/components/Shared/EmptyState";
 import { AlertBanner } from "@/components/Shared/AlertBanner";
 import { SkeletonCard } from "@/components/Shared/SkeletonCard";
+import { Modal } from "@/components/Shared/Modal";
+import { Button } from "@/components/Shared/Button";
 import { Icon } from "@/components/Shared/Icon";
 import { cn } from "@/lib/utils";
-import { useAdminEvents } from "@/lib/api/hooks/useAdminData";
+import { useAdminEvents, useUpdateAdminEvent, useDeleteAdminEvent } from "@/lib/api/hooks/useAdminData";
 import type { AdminEventRow } from "@/types/event";
 
 type FilterTab = "All" | "Upcoming" | "Ongoing" | "Completed" | "Flagged";
@@ -19,12 +22,37 @@ const FILTER_TO_STATUS: Record<FilterTab, string | undefined> = {
   Upcoming:  "PUBLISHED",
   Ongoing:   "ONGOING",
   Completed: "COMPLETED",
-  Flagged:   undefined,  // all statuses, then filter fraud > 5 client-side
+  Flagged:   undefined,  // all statuses, then filter flagged === true client-side
 };
 
+// Wraps whichever event row is pending a flag toggle so PATCH targets the right id.
+function FlagToggleButton({ event }: { event: AdminEventRow }) {
+  const updateEvent = useUpdateAdminEvent(event.id);
+
+  return (
+    <button
+      type="button"
+      aria-label={event.flagged ? `Unflag ${event.name}` : `Flag ${event.name}`}
+      aria-pressed={event.flagged}
+      disabled={updateEvent.isPending}
+      onClick={() => updateEvent.mutate({ flagged: !event.flagged })}
+      className={cn(
+        "w-8 h-8 rounded border inline-flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-warning disabled:opacity-50",
+        event.flagged
+          ? "border-status-warning/40 text-status-warning bg-status-warning-bg"
+          : "border-border text-text-secondary hover:border-status-warning/40 hover:text-status-warning",
+      )}
+    >
+      <Icon name="Flag" size={15} />
+    </button>
+  );
+}
+
 export default function AdminEventsPage() {
-  const [filter, setFilter] = useState<FilterTab>("All");
-  const [q,      setQ]      = useState("");
+  const router = useRouter();
+  const [filter,       setFilter]       = useState<FilterTab>("All");
+  const [q,            setQ]            = useState("");
+  const [removeTarget, setRemoveTarget] = useState<AdminEventRow | null>(null);
 
   const { data: result, isLoading, isError, error } = useAdminEvents({
     status: FILTER_TO_STATUS[filter],
@@ -32,13 +60,23 @@ export default function AdminEventsPage() {
     limit:  50,
   });
 
+  const deleteEvent = useDeleteAdminEvent(removeTarget?.id ?? "");
+
   const allRows = result?.data ?? [];
 
-  // Flagged: events with fraud > 5 — currently 0 in real data since fraud field is always 0
-  // (scan-level fraud query not included in list endpoint). Show all with note.
   const rows: AdminEventRow[] = filter === "Flagged"
-    ? allRows.filter((e) => e.fraud > 5)
+    ? allRows.filter((e) => e.flagged)
     : allRows;
+
+  const confirmRemove = async () => {
+    if (!removeTarget) return;
+    try {
+      await deleteEvent.mutateAsync();
+      setRemoveTarget(null);
+    } catch {
+      // Error shown in modal via deleteEvent.isError
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-full">
@@ -76,15 +114,6 @@ export default function AdminEventsPage() {
             tone="danger"
             title="Could not load events"
             message={error?.message ?? "Please try again."}
-          />
-        )}
-
-        {/* Flagged banner */}
-        {filter === "Flagged" && !isLoading && (
-          <AlertBanner
-            tone="info"
-            title="Fraud data coming soon"
-            message="Per-event fraud counts require scan aggregation — currently showing 0. This will be live once scan history is indexed."
           />
         )}
 
@@ -140,7 +169,12 @@ export default function AdminEventsPage() {
                 <tbody>
                   {rows.map((e) => (
                     <tr key={e.id} className="border-b border-border/50 last:border-b-0 hover:bg-surface-bg/50">
-                      <td className="px-5 py-3.5 font-semibold">{e.name}</td>
+                      <td className="px-5 py-3.5 font-semibold">
+                        <div className="flex items-center gap-2">
+                          {e.flagged && <Icon name="Flag" size={13} className="text-status-warning shrink-0" />}
+                          {e.name}
+                        </div>
+                      </td>
                       <td className="px-4 py-3.5 text-text-muted">{e.organizer}</td>
                       <td className="px-4 py-3.5">{e.date}</td>
                       <td className="px-4 py-3.5 font-mono text-[13px]">{e.sold.toLocaleString()}</td>
@@ -157,20 +191,16 @@ export default function AdminEventsPage() {
                           <button
                             type="button"
                             aria-label={`View ${e.name}`}
+                            onClick={() => router.push(`/explore/${e.id}`)}
                             className="w-8 h-8 rounded border border-border text-text-secondary inline-flex items-center justify-center hover:border-brand-orange/40 hover:text-brand-orange transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
                           >
                             <Icon name="Eye" size={15} />
                           </button>
-                          <button
-                            type="button"
-                            aria-label={`Flag ${e.name}`}
-                            className="w-8 h-8 rounded border border-border text-text-secondary inline-flex items-center justify-center hover:border-status-warning/40 hover:text-status-warning transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-warning"
-                          >
-                            <Icon name="Flag" size={15} />
-                          </button>
+                          <FlagToggleButton event={e} />
                           <button
                             type="button"
                             aria-label={`Remove ${e.name}`}
+                            onClick={() => setRemoveTarget(e)}
                             className="w-8 h-8 rounded border border-border text-text-secondary inline-flex items-center justify-center hover:border-status-danger/40 hover:text-status-danger transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-danger"
                           >
                             <Icon name="Trash2" size={15} />
@@ -185,6 +215,55 @@ export default function AdminEventsPage() {
           </div>
         )}
       </div>
+
+      {/* Remove confirm modal */}
+      {removeTarget && (
+        <Modal
+          open
+          title={`Remove ${removeTarget.name}?`}
+          description="This permanently deletes the event and all its ticket tiers, bookings, and tickets."
+          onClose={() => { if (!deleteEvent.isPending) { setRemoveTarget(null); deleteEvent.reset(); } }}
+          footer={
+            <>
+              <Button
+                variant="ghost"
+                onClick={() => { setRemoveTarget(null); deleteEvent.reset(); }}
+                disabled={deleteEvent.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                className="gap-2"
+                onClick={confirmRemove}
+                disabled={deleteEvent.isPending}
+              >
+                {deleteEvent.isPending ? (
+                  <>
+                    <Icon name="Loader" size={15} className="animate-spin" />
+                    Removing...
+                  </>
+                ) : (
+                  <>
+                    <Icon name="Trash2" size={15} />
+                    Remove event
+                  </>
+                )}
+              </Button>
+            </>
+          }
+        >
+          {deleteEvent.isError ? (
+            <AlertBanner
+              tone="danger"
+              title="Could not remove event"
+              message={deleteEvent.error?.message ?? "Please try again."}
+            />
+          ) : (
+            <AlertBanner tone="danger" title="Irreversible action" message="All ticket data for this event will be permanently removed." />
+          )}
+        </Modal>
+      )}
     </div>
   );
 }
