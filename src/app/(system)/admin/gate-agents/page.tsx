@@ -9,6 +9,7 @@ import { Modal } from "@/components/Shared/Modal";
 import { Button } from "@/components/Shared/Button";
 import { Icon } from "@/components/Shared/Icon";
 import { useAgents } from "@/lib/api/hooks/useAgents";
+import { useUpdateAgent } from "@/lib/api/hooks/useUpdateAgent";
 import { initials } from "@/components/Organizer/OrgTopbar";
 import type { GateAgentType } from "@/types/user";
 
@@ -18,10 +19,22 @@ import type { GateAgentType } from "@/types/user";
 // currently null/0 in seed data — displayed as "—" / 0 until agents scan.
 
 export default function AdminGateAgentsPage() {
-  const [historyAgent,    setHistoryAgent]    = useState<GateAgentType | null>(null);
-  const [deactivateAgent, setDeactivateAgent] = useState<GateAgentType | null>(null);
+  const [historyAgent,  setHistoryAgent]  = useState<GateAgentType | null>(null);
+  const [toggleTarget,  setToggleTarget]  = useState<GateAgentType | null>(null);
 
   const { data: agents = [], isLoading, isError, error } = useAgents({ limit: 50 });
+  const updateAgent = useUpdateAgent(String(toggleTarget?.id ?? ""));
+
+  const confirmToggle = async () => {
+    if (!toggleTarget) return;
+    const newStatus = toggleTarget.status === "Active" ? "INACTIVE" : "ACTIVE";
+    try {
+      await updateAgent.mutateAsync({ status: newStatus });
+      setToggleTarget(null);
+    } catch {
+      // Error shown in modal via updateAgent.isError
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-full">
@@ -111,8 +124,8 @@ export default function AdminGateAgentsPage() {
                           </button>
                           <button
                             type="button"
-                            aria-label={`Deactivate ${a.name}`}
-                            onClick={() => setDeactivateAgent(a)}
+                            aria-label={a.status === "Active" ? `Deactivate ${a.name}` : `Reactivate ${a.name}`}
+                            onClick={() => setToggleTarget(a)}
                             className="w-8 h-8 rounded border border-border text-text-secondary inline-flex items-center justify-center hover:border-status-danger/40 hover:text-status-danger transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-danger"
                           >
                             <Icon name="Power" size={15} />
@@ -147,28 +160,57 @@ export default function AdminGateAgentsPage() {
         </Modal>
       )}
 
-      {/* Deactivate confirm modal */}
-      {deactivateAgent && (
+      {/* Deactivate / reactivate confirm modal */}
+      {toggleTarget && (
         <Modal
           open
-          title={`Deactivate ${deactivateAgent.name}?`}
-          description="They will be signed out of the scanner and unable to validate tickets."
-          onClose={() => setDeactivateAgent(null)}
+          title={toggleTarget.status === "Active" ? `Deactivate ${toggleTarget.name}?` : `Reactivate ${toggleTarget.name}?`}
+          description={
+            toggleTarget.status === "Active"
+              ? "They will be signed out of the scanner and unable to validate tickets."
+              : "They will be able to sign back in and validate tickets."
+          }
+          onClose={() => { if (!updateAgent.isPending) { setToggleTarget(null); updateAgent.reset(); } }}
           footer={
             <>
-              <Button variant="ghost" onClick={() => setDeactivateAgent(null)}>Cancel</Button>
+              <Button
+                variant="ghost"
+                onClick={() => { setToggleTarget(null); updateAgent.reset(); }}
+                disabled={updateAgent.isPending}
+              >
+                Cancel
+              </Button>
               <Button
                 variant="danger"
                 className="gap-2"
-                onClick={() => setDeactivateAgent(null)}
+                onClick={confirmToggle}
+                disabled={updateAgent.isPending}
               >
-                <Icon name="Power" size={15} />
-                Deactivate
+                {updateAgent.isPending ? (
+                  <>
+                    <Icon name="Loader" size={15} className="animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Icon name="Power" size={15} />
+                    {toggleTarget.status === "Active" ? "Deactivate" : "Reactivate"}
+                  </>
+                )}
               </Button>
             </>
           }
         >
-          <p className="text-sm text-text-secondary">You can reactivate them at any time.</p>
+          {updateAgent.isError && (
+            <AlertBanner
+              tone="danger"
+              title="Update failed"
+              message={updateAgent.error?.message ?? "Please try again."}
+            />
+          )}
+          {!updateAgent.isError && toggleTarget.status === "Active" && (
+            <p className="text-sm text-text-secondary">You can reactivate them at any time.</p>
+          )}
         </Modal>
       )}
     </div>
