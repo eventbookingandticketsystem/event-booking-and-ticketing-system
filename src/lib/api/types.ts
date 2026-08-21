@@ -179,6 +179,16 @@ export interface ApiScanRecord {
   ticketRef: string | null;
 }
 
+/** One scan record from GET /api/agents/[id]/scans — includes the rejection reason */
+export interface ApiAgentScanRecord {
+  id:        string;
+  result:    "ADMIT" | "ALREADY_USED" | "INVALID" | "WRONG_EVENT" | "EXPIRED";
+  scannedAt: string;    // ISO DateTime
+  gate:      string;
+  ticketRef: string | null;
+  note:      string | null;
+}
+
 /** Tier breakdown item returned by /api/organizer/dashboard */
 export interface ApiTierBreakdown {
   name: string;
