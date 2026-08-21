@@ -6,7 +6,7 @@ export type StatusValue =
   | "Valid" | "Admitted" | "Online" | "Active" | "Completed" | "Confirmed" | "Published" | "Live"
   | "Used" | "Expired" | "Past" | "Inactive" | "Draft" | "Archived"
   | "Selling Fast" | "Ongoing" | "Pending" | "Offline" | "Low stock"
-  | "Sold Out" | "Rejected" | "Cancelled" | "Fraud"
+  | "Sold Out" | "Rejected" | "Cancelled" | "Fraud" | "Suspended"
   | "Upcoming";
 
 const STATUS_TONE: Record<StatusValue, Tone> = {
@@ -33,6 +33,7 @@ const STATUS_TONE: Record<StatusValue, Tone> = {
   Rejected:     "danger",
   Cancelled:    "danger",
   Fraud:        "danger",
+  Suspended:    "danger",
   Upcoming:     "info",
 };
 
