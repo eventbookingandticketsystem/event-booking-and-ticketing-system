@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../client";
-import type { ApiResponse, ApiGateAgent, ApiCreatedAgent } from "../types";
+import type { ApiResponse, ApiGateAgent, ApiCreatedAgent, ApiAgentScanRecord } from "../types";
 import type { GateAgentType } from "@/types/user";
 
 // ── Adapter ───────────────────────────────────────────────────────────────────
@@ -79,6 +79,22 @@ export function useRawAgents(params: UseAgentsParams = {}) {
       const qs  = sp.toString();
       const url = qs ? `/agents?${qs}` : "/agents";
       const res = await apiClient.get<ApiResponse<ApiGateAgent[]>>(url);
+      return res.data.data;
+    },
+  });
+}
+
+/**
+ * GET /api/agents/[id]/scans — an agent's own scan history (ORGANIZER owner or ADMIN).
+ */
+export function useAgentScans(agentId: string | null | undefined, limit = 50) {
+  return useQuery<ApiAgentScanRecord[]>({
+    queryKey: ["agent-scans", agentId, limit] as const,
+    enabled:  !!agentId,
+    queryFn:  async () => {
+      const res = await apiClient.get<ApiResponse<ApiAgentScanRecord[]>>(
+        `/agents/${encodeURIComponent(agentId!)}/scans?limit=${limit}`,
+      );
       return res.data.data;
     },
   });
