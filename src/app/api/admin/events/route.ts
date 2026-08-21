@@ -29,7 +29,22 @@ export async function GET(req: NextRequest) {
         skip,
         take:    limit,
         orderBy: { createdAt: "desc" },
-        include: {
+        select: {
+          id:          true,
+          title:       true,
+          description: true,
+          venue:       true,
+          city:        true,
+          date:        true,
+          time:        true,
+          category:    true,
+          poster:      true,
+          status:      true,
+          flagged:     true,
+          organizer:   true,
+          orgProfileId: true,
+          createdAt:   true,
+          updatedAt:   true,
           orgProfile: {
             select: { id: true, orgName: true, contactName: true },
           },
