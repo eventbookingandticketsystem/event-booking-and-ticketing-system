@@ -76,5 +76,6 @@ export interface AdminEventRow {
   date: string;
   sold: number;
   fraud: number;
+  flagged: boolean;
   status: "Ongoing" | "Upcoming" | "Completed" | "Draft";
 }
