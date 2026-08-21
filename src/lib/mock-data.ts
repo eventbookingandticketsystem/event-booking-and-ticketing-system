@@ -601,6 +601,7 @@ export const ALL_EVENTS: AdminEventRow[] = [
     date: "14 Dec 2025",
     sold: 1891,
     fraud: 4,
+    flagged: false,
     status: "Ongoing",
   },
   {
@@ -610,6 +611,7 @@ export const ALL_EVENTS: AdminEventRow[] = [
     date: "22 Dec 2025",
     sold: 6260,
     fraud: 9,
+    flagged: true,
     status: "Upcoming",
   },
   {
@@ -619,6 +621,7 @@ export const ALL_EVENTS: AdminEventRow[] = [
     date: "17 Dec 2025",
     sold: 244,
     fraud: 1,
+    flagged: false,
     status: "Upcoming",
   },
   {
@@ -628,6 +631,7 @@ export const ALL_EVENTS: AdminEventRow[] = [
     date: "5 Dec 2025",
     sold: 1060,
     fraud: 7,
+    flagged: true,
     status: "Completed",
   },
   {
@@ -637,6 +641,7 @@ export const ALL_EVENTS: AdminEventRow[] = [
     date: "28 Dec 2025",
     sold: 0,
     fraud: 0,
+    flagged: false,
     status: "Draft",
   },
 ];
