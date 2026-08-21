@@ -13,7 +13,13 @@ import { DEFAULT_PHONE, type PhoneValue } from "@/constants/countries";
 import { formatSSP } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { OrganizerType } from "@/types/user";
-import { useAdminUsers, useAdminEvents, adaptAdminUserToOrganizer } from "@/lib/api/hooks/useAdminData";
+import {
+  useAdminUsers,
+  useAdminEvents,
+  useUpdateAdminUser,
+  useDeleteAdminUser,
+  adaptAdminUserToOrganizer,
+} from "@/lib/api/hooks/useAdminData";
 import { useAgents } from "@/lib/api/hooks/useAgents";
 import type { ApiAdminUser } from "@/lib/api/types";
 
@@ -148,8 +154,10 @@ function OrganizerDetailPanel({
   onBack: () => void;
 }) {
   const [tab,            setTab]            = useState<"events" | "agents" | "activity">("events");
-  const [status,         setStatus]         = useState(adapted.status);
   const [confirmSuspend, setConfirmSuspend] = useState(false);
+
+  const updateUser = useUpdateAdminUser(apiUser.id);
+  const status = adapted.status;
 
   // Events for this organizer (filter by orgProfileId if available)
   const { data: eventsResult } = useAdminEvents({ limit: 20 });
@@ -161,7 +169,16 @@ function OrganizerDetailPanel({
 
   const handleToggle = () => {
     if (status === "Active") setConfirmSuspend(true);
-    else setStatus("Active");
+    else updateUser.mutate({ status: "Active" });
+  };
+
+  const confirmSuspendAction = async () => {
+    try {
+      await updateUser.mutateAsync({ status: "Suspended" });
+      setConfirmSuspend(false);
+    } catch {
+      // Error shown in modal via updateUser.isError
+    }
   };
 
   return (
@@ -184,12 +201,21 @@ function OrganizerDetailPanel({
           variant={status === "Active" ? "ghost" : "primary"}
           className="gap-2 shrink-0"
           onClick={handleToggle}
+          disabled={updateUser.isPending}
           aria-label={status === "Active" ? `Suspend ${adapted.name}` : `Activate ${adapted.name}`}
         >
           <Icon name={status === "Active" ? "Ban" : "Check"} size={15} />
           {status === "Active" ? "Suspend" : "Activate"}
         </Button>
       </div>
+
+      {updateUser.isError && (
+        <AlertBanner
+          tone="danger"
+          title="Could not update organizer"
+          message={updateUser.error?.message ?? "Please try again."}
+        />
+      )}
 
       {status === "Suspended" && (
         <AlertBanner
@@ -327,22 +353,46 @@ function OrganizerDetailPanel({
           open
           title={`Suspend ${adapted.name}?`}
           description="They will be unable to create or manage events until reactivated."
-          onClose={() => setConfirmSuspend(false)}
+          onClose={() => { if (!updateUser.isPending) { setConfirmSuspend(false); updateUser.reset(); } }}
           footer={
             <>
-              <Button variant="ghost" onClick={() => setConfirmSuspend(false)}>Cancel</Button>
+              <Button
+                variant="ghost"
+                onClick={() => { setConfirmSuspend(false); updateUser.reset(); }}
+                disabled={updateUser.isPending}
+              >
+                Cancel
+              </Button>
               <Button
                 variant="danger"
                 className="gap-2"
-                onClick={() => { setStatus("Suspended"); setConfirmSuspend(false); }}
+                onClick={confirmSuspendAction}
+                disabled={updateUser.isPending}
               >
-                <Icon name="Ban" size={15} />
-                Suspend
+                {updateUser.isPending ? (
+                  <>
+                    <Icon name="Loader" size={15} className="animate-spin" />
+                    Suspending...
+                  </>
+                ) : (
+                  <>
+                    <Icon name="Ban" size={15} />
+                    Suspend
+                  </>
+                )}
               </Button>
             </>
           }
         >
-          <p className="text-sm text-text-secondary">Active events stay live, but no new changes can be made.</p>
+          {updateUser.isError ? (
+            <AlertBanner
+              tone="danger"
+              title="Could not suspend organizer"
+              message={updateUser.error?.message ?? "Please try again."}
+            />
+          ) : (
+            <p className="text-sm text-text-secondary">Active events stay live, but no new changes can be made.</p>
+          )}
         </Modal>
       )}
     </div>
@@ -351,14 +401,20 @@ function OrganizerDetailPanel({
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function AdminOrganizersPage() {
-  const [q,          setQ]          = useState("");
-  const [addModal,   setAddModal]   = useState(false);
+  const [q,           setQ]           = useState("");
+  const [addModal,    setAddModal]    = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ type: "suspend" | "delete"; user: ApiAdminUser } | null>(null);
-  const [selected,   setSelected]   = useState<ApiAdminUser | null>(null);
+  const [selectedId,  setSelectedId]  = useState<string | null>(null);
 
   const { data: result, isLoading, isError, error } = useAdminUsers({ role: "ORGANIZER", limit: 50 });
   const apiUsers  = result?.data ?? [];
   const adapted   = apiUsers.map(adaptAdminUserToOrganizer);
+
+  // Derived (not snapshotted) so it reflects the latest fetch after a mutation invalidates the query.
+  const selected = selectedId ? apiUsers.find((u) => u.id === selectedId) ?? null : null;
+
+  const updateUser = useUpdateAdminUser(confirmModal?.user.id ?? "");
+  const deleteUser = useDeleteAdminUser();
 
   // Search filter (client-side — results already scoped to ORGANIZER role)
   const filtered  = adapted.filter((o) =>
@@ -366,6 +422,32 @@ export default function AdminOrganizersPage() {
   );
 
   const existingPhones = apiUsers.map((u) => (u.phone ?? "").replace(/\s/g, ""));
+
+  const closeConfirmModal = () => {
+    setConfirmModal(null);
+    updateUser.reset();
+    deleteUser.reset();
+  };
+
+  const confirmSuspend = async () => {
+    if (!confirmModal) return;
+    try {
+      await updateUser.mutateAsync({ status: "Suspended" });
+      setConfirmModal(null);
+    } catch {
+      // Error shown in modal via updateUser.isError
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!confirmModal) return;
+    try {
+      await deleteUser.mutateAsync(confirmModal.user.id);
+      setConfirmModal(null);
+    } catch {
+      // Error shown in modal via deleteUser.isError
+    }
+  };
 
   // ── Detail view ────────────────────────────────────────────────────────────
   if (selected) {
@@ -375,7 +457,7 @@ export default function AdminOrganizersPage() {
         <OrganizerDetailPanel
           apiUser={selected}
           adapted={adaptedSelected}
-          onBack={() => setSelected(null)}
+          onBack={() => setSelectedId(null)}
         />
       </div>
     );
@@ -457,14 +539,14 @@ export default function AdminOrganizersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((o, idx) => {
-                    const apiUser = apiUsers[idx];
+                  {filtered.map((o) => {
+                    const apiUser = apiUsers.find((u) => u.id === o.id)!;
                     return (
                       <tr key={o.id} className="border-b border-border/50 last:border-b-0 hover:bg-surface-bg/50">
                         <td className="px-5 py-4">
                           <button
                             type="button"
-                            onClick={() => setSelected(apiUser)}
+                            onClick={() => setSelectedId(o.id)}
                             className="font-semibold text-text hover:text-brand-orange transition-colors focus-visible:outline-none text-left"
                           >
                             {o.name}
@@ -482,7 +564,7 @@ export default function AdminOrganizersPage() {
                             <button
                               type="button"
                               aria-label={`View ${o.name}`}
-                              onClick={() => setSelected(apiUser)}
+                              onClick={() => setSelectedId(o.id)}
                               className="w-8 h-8 rounded border border-border text-text-secondary inline-flex items-center justify-center hover:border-brand-orange/40 hover:text-brand-orange transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
                             >
                               <Icon name="Eye" size={15} />
@@ -529,18 +611,35 @@ export default function AdminOrganizersPage() {
           open
           title={`Suspend ${confirmModal.user.name ?? "organizer"}?`}
           description="They will be unable to create or manage events until reactivated."
-          onClose={() => setConfirmModal(null)}
+          onClose={() => { if (!updateUser.isPending) closeConfirmModal(); }}
           footer={
             <>
-              <Button variant="ghost" onClick={() => setConfirmModal(null)}>Cancel</Button>
-              <Button variant="danger" className="gap-2" onClick={() => setConfirmModal(null)}>
-                <Icon name="Ban" size={15} />
-                Suspend
+              <Button variant="ghost" onClick={closeConfirmModal} disabled={updateUser.isPending}>Cancel</Button>
+              <Button variant="danger" className="gap-2" onClick={confirmSuspend} disabled={updateUser.isPending}>
+                {updateUser.isPending ? (
+                  <>
+                    <Icon name="Loader" size={15} className="animate-spin" />
+                    Suspending...
+                  </>
+                ) : (
+                  <>
+                    <Icon name="Ban" size={15} />
+                    Suspend
+                  </>
+                )}
               </Button>
             </>
           }
         >
-          <p className="text-sm text-text-secondary">Active events stay live, but no new changes can be made.</p>
+          {updateUser.isError ? (
+            <AlertBanner
+              tone="danger"
+              title="Could not suspend organizer"
+              message={updateUser.error?.message ?? "Please try again."}
+            />
+          ) : (
+            <p className="text-sm text-text-secondary">Active events stay live, but no new changes can be made.</p>
+          )}
         </Modal>
       )}
 
@@ -549,19 +648,36 @@ export default function AdminOrganizersPage() {
         <Modal
           open
           title={`Delete ${confirmModal.user.name ?? "organizer"}?`}
-          description="This permanently removes the organizer and all their draft events."
-          onClose={() => setConfirmModal(null)}
+          description="This permanently removes the organizer and all their events."
+          onClose={() => { if (!deleteUser.isPending) closeConfirmModal(); }}
           footer={
             <>
-              <Button variant="ghost" onClick={() => setConfirmModal(null)}>Cancel</Button>
-              <Button variant="danger" className="gap-2" onClick={() => setConfirmModal(null)}>
-                <Icon name="Trash2" size={15} />
-                Delete organizer
+              <Button variant="ghost" onClick={closeConfirmModal} disabled={deleteUser.isPending}>Cancel</Button>
+              <Button variant="danger" className="gap-2" onClick={confirmDelete} disabled={deleteUser.isPending}>
+                {deleteUser.isPending ? (
+                  <>
+                    <Icon name="Loader" size={15} className="animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Icon name="Trash2" size={15} />
+                    Delete organizer
+                  </>
+                )}
               </Button>
             </>
           }
         >
-          <AlertBanner tone="danger" title="Irreversible action" message="All their events and ticket data will be permanently removed." />
+          {deleteUser.isError ? (
+            <AlertBanner
+              tone="danger"
+              title="Could not delete organizer"
+              message={deleteUser.error?.message ?? "Please try again."}
+            />
+          ) : (
+            <AlertBanner tone="danger" title="Irreversible action" message="All their events and ticket data will be permanently removed." />
+          )}
         </Modal>
       )}
     </div>
