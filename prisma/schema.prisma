@@ -185,6 +185,7 @@ model Event {
   about       String?
   status      EventStatus @default(DRAFT)
   featured    Boolean     @default(false)
+  flagged     Boolean     @default(false)
 
   // optional link to organizer account
   orgProfileId String?    @db.ObjectId
