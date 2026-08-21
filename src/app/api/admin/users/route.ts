@@ -36,6 +36,9 @@ export async function GET(req: NextRequest) {
       image:     true,
       createdAt: true,
       updatedAt: true,
+      orgProfile: {
+        select: { id: true, orgName: true, contactName: true, status: true },
+      },
       // password intentionally excluded
     };
 
