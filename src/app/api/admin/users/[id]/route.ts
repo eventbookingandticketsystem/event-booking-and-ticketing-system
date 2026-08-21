@@ -26,9 +26,10 @@ const USER_SELECT = {
 
 // Inline patch schema
 const patchUserSchema = z.object({
-  role:  z.enum(["ATTENDEE", "ORGANIZER", "GATE_AGENT", "ADMIN"]).optional(),
-  name:  z.string().min(2).optional(),
-  phone: z.string().optional(),
+  role:   z.enum(["ATTENDEE", "ORGANIZER", "GATE_AGENT", "ADMIN"]).optional(),
+  name:   z.string().min(2).optional(),
+  phone:  z.string().optional(),
+  status: z.enum(["Active", "Suspended"]).optional(),
 });
 
 // ── GET /api/admin/users/[id] ──────────────────────────────────────────────
@@ -72,10 +73,17 @@ export async function PATCH(
       );
     }
 
+    const { status, ...userFields } = parsed.data;
+
+    // "status" lives on OrgProfile (suspend/reactivate an organizer), not User.
+    if (status) {
+      await prisma.orgProfile.updateMany({ where: { userId: id }, data: { status } });
+    }
+
     // Only update fields that were provided
     const updated = await prisma.user.update({
       where: { id },
-      data:  parsed.data,
+      data:  userFields,
       select: USER_SELECT,
     });
 
@@ -109,6 +117,24 @@ export async function DELETE(
     await prisma.account.deleteMany({ where: { userId: id } });
     await prisma.ticket.deleteMany({ where: { ownerId: id } });
     await prisma.booking.deleteMany({ where: { userId: id } });
+
+    // If this user is an organizer, remove their events (and everything under them) too.
+    const orgProfile = await prisma.orgProfile.findUnique({ where: { userId: id }, select: { id: true } });
+    if (orgProfile) {
+      const events = await prisma.event.findMany({ where: { orgProfileId: orgProfile.id }, select: { id: true } });
+      const eventIds = events.map((e) => e.id);
+      if (eventIds.length > 0) {
+        await prisma.scanRecord.deleteMany({ where: { eventId: { in: eventIds } } });
+        await prisma.entryRatePoint.deleteMany({ where: { eventId: { in: eventIds } } });
+        await prisma.gateAgent.deleteMany({ where: { eventId: { in: eventIds } } });
+        await prisma.ticket.deleteMany({ where: { eventId: { in: eventIds } } });
+        await prisma.bookingLine.deleteMany({ where: { booking: { eventId: { in: eventIds } } } });
+        await prisma.booking.deleteMany({ where: { eventId: { in: eventIds } } });
+        await prisma.ticketTier.deleteMany({ where: { eventId: { in: eventIds } } });
+        await prisma.event.deleteMany({ where: { id: { in: eventIds } } });
+      }
+    }
+
     await prisma.orgProfile.deleteMany({ where: { userId: id } });
     await prisma.agentProfile.deleteMany({ where: { userId: id } });
     await prisma.user.delete({ where: { id } });
