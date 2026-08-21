@@ -23,9 +23,15 @@ export interface UseAdminEventsParams {
 }
 
 export interface UpdateUserInput {
-  role?:  string;
-  name?:  string;
-  phone?: string;
+  role?:   string;
+  name?:   string;
+  phone?:  string;
+  status?: "Active" | "Suspended";
+}
+
+export interface UpdateEventFlagsInput {
+  flagged?: boolean;
+  status?:  string;
 }
 
 // ── Adapters ──────────────────────────────────────────────────────────────────
@@ -62,7 +68,7 @@ export function adaptAdminUserToOrganizer(u: ApiAdminUser): OrganizerType {
     org:     u.orgProfile?.orgName ?? "—",
     events:  0,    // not returned by the list endpoint — shown as "—" in UI
     revenue: 0,    // not returned — shown as "—" in UI
-    status:  "Active" as const,
+    status:  (u.orgProfile?.status === "Suspended" ? "Suspended" : "Active") as "Active" | "Suspended",
     joined,
   };
 }
@@ -80,6 +86,7 @@ export function adaptAdminEvent(e: ApiAdminEvent): AdminEventRow {
     status:     adaptEventStatus(e.status),
     sold:       e._count.tickets,  // tickets issued ≈ sold
     fraud:      0,                 // not in list endpoint — scan query required
+    flagged:    e.flagged ?? false,
   };
 }
 
@@ -162,6 +169,57 @@ export function useUpdateAdminUser(userId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       queryClient.invalidateQueries({ queryKey: ["admin-user", userId] });
+    },
+  });
+}
+
+/**
+ * PATCH /api/admin/events/[id] — toggle `flagged` or `status` (ADMIN only).
+ */
+export function useUpdateAdminEvent(eventId: string) {
+  const queryClient = useQueryClient();
+  return useMutation<ApiAdminEvent, Error, UpdateEventFlagsInput>({
+    mutationFn: async (input) => {
+      const res = await apiClient.patch<ApiResponse<ApiAdminEvent>>(`/admin/events/${eventId}`, input);
+      return res.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-events"] });
+    },
+  });
+}
+
+/**
+ * DELETE /api/admin/events/[id] — permanently remove an event (ADMIN only).
+ */
+export function useDeleteAdminEvent(eventId: string) {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, void>({
+    mutationFn: async () => {
+      await apiClient.delete(`/admin/events/${eventId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-events"] });
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      queryClient.invalidateQueries({ queryKey: ["explore-events"] });
+    },
+  });
+}
+
+/**
+ * DELETE /api/admin/users/[id] — permanently remove a user (and, for
+ * organizers, their events/tiers/tickets/bookings/gate agents). ADMIN only.
+ */
+export function useDeleteAdminUser() {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: async (userId) => {
+      await apiClient.delete(`/admin/users/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-events"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
     },
   });
 }
