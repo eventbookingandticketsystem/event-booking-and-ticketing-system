@@ -10,6 +10,7 @@ import { Button } from "@/components/Shared/Button";
 import { Icon } from "@/components/Shared/Icon";
 import { useAgents } from "@/lib/api/hooks/useAgents";
 import { useUpdateAgent } from "@/lib/api/hooks/useUpdateAgent";
+import { AgentScanHistory } from "@/components/Shared/AgentScanHistory";
 import { initials } from "@/components/Organizer/OrgTopbar";
 import type { GateAgentType } from "@/types/user";
 
@@ -141,7 +142,7 @@ export default function AdminGateAgentsPage() {
         )}
       </div>
 
-      {/* Scan history modal — no real scan history per-agent in API yet */}
+      {/* Scan history modal */}
       {historyAgent && (
         <Modal
           open
@@ -150,13 +151,7 @@ export default function AdminGateAgentsPage() {
           onClose={() => setHistoryAgent(null)}
           footer={<Button variant="ghost" onClick={() => setHistoryAgent(null)}>Close</Button>}
         >
-          <div className="py-6">
-            <EmptyState
-              icon="ScanLine"
-              heading="Scan history coming soon"
-              subtext="Per-agent scan history will be available once the scanner runtime is wired."
-            />
-          </div>
+          <AgentScanHistory agentId={String(historyAgent.id)} />
         </Modal>
       )}
 
