@@ -348,8 +348,9 @@ export interface ApiAdminUser {
     id:          string;
     orgName:     string;
     contactName: string;
-    website:     string | null;
-    description: string | null;
+    status?:     string;   // "Active" | "Suspended"
+    website?:    string | null;
+    description?: string | null;
   } | null;
   agentProfile?: {
     id:    string;
@@ -432,6 +433,7 @@ export interface ApiAdminEvent {
   category:    string;
   poster:      string | null;
   status:      string;       // "DRAFT" | "PUBLISHED" | "ONGOING" | "COMPLETED" | "CANCELLED"
+  flagged:     boolean;
   organizer:   string;
   orgProfileId: string;
   createdAt:   string;
