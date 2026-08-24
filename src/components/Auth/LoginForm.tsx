@@ -10,7 +10,7 @@ import { Icon } from "@/components/Shared/Icon";
 import { FcGoogle } from "react-icons/fc";
 import { DEFAULT_PHONE, type PhoneValue } from "@/constants/countries";
 import { cn } from "@/lib/utils";
-import { ROUTES } from "@/constants/routes";
+import { ROUTES, SUPPORT_EMAIL } from "@/constants/routes";
 
 interface LoginFormProps {
   onRegister: () => void;
@@ -51,6 +51,7 @@ export function LoginForm({ onRegister, onForgot, banner, callbackUrl }: LoginFo
   const [loading, setLoading] = useState(false);
   const [touched, setTouched] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isSuspended, setIsSuspended] = useState(false);
   const [isGoogleSign, setIsGoogleSign] = useState(false);
 
   // Inline validation
@@ -77,6 +78,7 @@ export function LoginForm({ onRegister, onForgot, banner, callbackUrl }: LoginFo
 
     setLoading(true);
     setAuthError(null);
+    setIsSuspended(false);
 
     // Combine dial code + local number: "+211" + "912000001" → "+211912000001"
     const fullPhone = phone.dial + phone.num;
@@ -88,7 +90,12 @@ export function LoginForm({ onRegister, onForgot, banner, callbackUrl }: LoginFo
     });
 
     if (!result?.ok || result.error) {
-      setAuthError("Invalid credentials. Check your details and try again.");
+      if (result?.error === "AccountSuspended") {
+        setIsSuspended(true);
+        setAuthError("Your account has been suspended and can't sign in right now.");
+      } else {
+        setAuthError("Invalid credentials. Check your details and try again.");
+      }
       setLoading(false);
       return;
     }
@@ -144,7 +151,25 @@ export function LoginForm({ onRegister, onForgot, banner, callbackUrl }: LoginFo
 
       {/* Auth error — shown only after a failed signIn attempt */}
       {authError && (
-        <AlertBanner tone="danger" title="Sign-in failed" message={authError} />
+        <AlertBanner
+          tone="danger"
+          title={isSuspended ? "Account suspended" : "Sign-in failed"}
+          message={authError}
+        />
+      )}
+
+      {/* Suspended accounts have no in-app appeal flow yet — point them to support */}
+      {isSuspended && (
+        <p className="-mt-2 text-sm text-text-secondary">
+          Think this is a mistake?{" "}
+          <a
+            href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Account reactivation request")}`}
+            className="font-semibold text-brand-orange hover:text-brand-orange-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange rounded"
+          >
+            Email {SUPPORT_EMAIL}
+          </a>{" "}
+          to request reactivation.
+        </p>
       )}
 
       {/* Phone */}
