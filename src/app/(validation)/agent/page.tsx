@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
 import { Icon } from "@/components/Shared/Icon";
 import { SkeletonCard } from "@/components/Shared/SkeletonCard";
 import { AlertBanner } from "@/components/Shared/AlertBanner";
@@ -82,25 +81,7 @@ export default function GateSelectorPage() {
   };
 
   return (
-    <div className="min-h-full bg-brand-navy flex flex-col">
-      {/* ── Top bar ── */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-white/8 shrink-0">
-        <div className="flex items-center gap-3">
-          <span className="w-9 h-9 rounded-md bg-brand-orange inline-flex items-center justify-center shrink-0">
-            <Icon name="ScanLine" size={20} className="text-white" />
-          </span>
-          <span className="font-display font-bold text-[18px] text-white">Tiketi Gate</span>
-        </div>
-        <button
-          type="button"
-          onClick={() => signOut({ redirect: true, callbackUrl: "/login" })}
-          className="flex items-center gap-1.5 text-sm text-white/50 hover:text-white transition-colors"
-        >
-          <Icon name="LogOut" size={15} />
-          Sign out
-        </button>
-      </header>
-
+    <div className="min-h-full bg-brand-navy flex flex-col overflow-y-auto">
       {/* ── Main content ── */}
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-lg">
