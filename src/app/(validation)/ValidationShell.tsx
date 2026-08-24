@@ -34,7 +34,7 @@ const PAGE_LABELS: Record<string, string> = {
   cash:     "Cash Entry",
 };
 
-// ── Top bar ───────────────────────────────────────────────────────────────
+// ── Mobile top bar ────────────────────────────────────────────────────────
 
 function AgentTopBar({ label }: { label: string }) {
   return (
@@ -65,7 +65,7 @@ function AgentTopBar({ label }: { label: string }) {
   );
 }
 
-// ── Bottom nav ────────────────────────────────────────────────────────────
+// ── Mobile bottom nav ─────────────────────────────────────────────────────
 
 function AgentBottomNav({ active }: { active: string }) {
   const router = useRouter();
@@ -97,6 +97,63 @@ function AgentBottomNav({ active }: { active: string }) {
   );
 }
 
+// ── Desktop sidebar ───────────────────────────────────────────────────────
+
+function AgentSidebar({ active }: { active: string }) {
+  const router = useRouter();
+  return (
+    <aside className="flex flex-col w-64 shrink-0 border-r border-white/8 bg-brand-navy-2/60 p-5 gap-6">
+      <div className="flex items-center gap-3">
+        <span className="w-9 h-9 rounded-md bg-brand-orange inline-flex items-center justify-center shrink-0">
+          <Icon name="ScanLine" size={18} className="text-white" />
+        </span>
+        <span className="font-display font-bold text-[16px] text-white">Tiketi Gate</span>
+      </div>
+
+      <nav className="flex flex-col gap-1" aria-label="Gate agent navigation">
+        {AGENT_NAV.map((item) => {
+          const isActive = active === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => router.push(item.route)}
+              aria-current={isActive ? "page" : undefined}
+              aria-label={item.label}
+              className={cn(
+                "flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-[14px] font-semibold font-body text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+                isActive ? "bg-white/10 text-white" : "text-white/60 hover:text-white hover:bg-white/6",
+              )}
+            >
+              <Icon name={item.icon} size={18} className="shrink-0" />
+              {item.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="mt-auto flex flex-col gap-1">
+        <button
+          type="button"
+          onClick={() => router.push(ROUTES.HOME)}
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-[13px] font-medium text-white/60 hover:bg-white/8 hover:text-white transition-colors"
+        >
+          <Icon name="House" size={16} />
+          Home
+        </button>
+        <button
+          type="button"
+          onClick={() => signOut({ redirect: true, callbackUrl: "/login" })}
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-[13px] font-medium text-red-400 hover:bg-white/8 hover:text-red-300 transition-colors"
+        >
+          <Icon name="LogOut" size={16} />
+          Sign out
+        </button>
+      </div>
+    </aside>
+  );
+}
+
 // ── Shell ─────────────────────────────────────────────────────────────────
 
 export default function ValidationShell({ children }: { children: React.ReactNode }) {
@@ -105,10 +162,19 @@ export default function ValidationShell({ children }: { children: React.ReactNod
   const pageLabel = PAGE_LABELS[activeTab] ?? "Scanner";
 
   return (
-    <div className="w-screen h-screen bg-brand-navy flex flex-col overflow-hidden">
-      <AgentTopBar label={pageLabel} />
-      <div className="flex-1 overflow-hidden">{children}</div>
-      <AgentBottomNav active={activeTab} />
-    </div>
+    <>
+      {/* Mobile — top bar + content + bottom nav */}
+      <div className="flex md:hidden w-screen h-screen bg-brand-navy flex-col overflow-hidden">
+        <AgentTopBar label={pageLabel} />
+        <div className="flex-1 overflow-hidden">{children}</div>
+        <AgentBottomNav active={activeTab} />
+      </div>
+
+      {/* Desktop — sidebar-only, no top bar or bottom nav */}
+      <div className="hidden md:flex w-screen h-screen bg-brand-navy overflow-hidden">
+        <AgentSidebar active={activeTab} />
+        <div className="flex-1 overflow-hidden">{children}</div>
+      </div>
+    </>
   );
 }
