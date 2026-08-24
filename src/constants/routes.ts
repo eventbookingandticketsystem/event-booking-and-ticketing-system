@@ -51,3 +51,7 @@ export type StaticRoute = Extract<
   (typeof ROUTES)[keyof typeof ROUTES],
   string
 >;
+
+// Shown to suspended accounts on the login screen so they know how to
+// request reactivation — no in-app inquiry/messaging system exists yet.
+export const SUPPORT_EMAIL = "support@tiketi.app";
