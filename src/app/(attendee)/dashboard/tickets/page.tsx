@@ -11,6 +11,7 @@ import { StatusPill } from "@/components/Shared/StatusPill";
 import type { StatusValue } from "@/components/Shared/StatusPill";
 import { cn, formatSSP, formatDate } from "@/lib/utils";
 import { useBookings } from "@/lib/api/hooks/useBookings";
+import { useCheckPaymentStatus } from "@/lib/api/hooks/useCheckPaymentStatus";
 import { ROUTES } from "@/constants/routes";
 import { POSTERS } from "@/lib/mock-data";
 import type { ApiMyBooking } from "@/lib/api/types";
@@ -58,9 +59,11 @@ interface EventGroupProps {
   bookings: ApiMyBooking[];
   onResume: (b: ApiMyBooking) => void;
   onRetry:  (b: ApiMyBooking) => void;
+  onCheckStatus: (b: ApiMyBooking) => void;
+  checkingBookingId: string | null;
 }
 
-function EventGroupCard({ bookings, onResume, onRetry }: EventGroupProps) {
+function EventGroupCard({ bookings, onResume, onRetry, onCheckStatus, checkingBookingId }: EventGroupProps) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
 
@@ -291,6 +294,21 @@ function EventGroupCard({ bookings, onResume, onRetry }: EventGroupProps) {
                       <>
                         <Button
                           size="sm"
+                          variant="ghost"
+                          onClick={() => onCheckStatus(booking)}
+                          disabled={checkingBookingId === booking.id}
+                          className="gap-1.5 text-text-secondary"
+                          aria-label={`Check payment status for ${booking.ref}`}
+                        >
+                          <Icon
+                            name="RefreshCw"
+                            size={14}
+                            className={cn(checkingBookingId === booking.id && "animate-spin")}
+                          />
+                          {checkingBookingId === booking.id ? "Checking…" : "Check status"}
+                        </Button>
+                        <Button
+                          size="sm"
                           onClick={() => onResume(booking)}
                           className="flex-1 gap-1.5"
                         >
@@ -333,8 +351,10 @@ function EventGroupCard({ bookings, onResume, onRetry }: EventGroupProps) {
 export default function TicketsPage() {
   const router = useRouter();
   const [tab, setTab] = useState<"upcoming" | "pending" | "past">("upcoming");
+  const [statusNotice, setStatusNotice] = useState<{ tone: "success" | "info"; message: string } | null>(null);
 
   const { data: allBookings, isLoading, isError, error } = useBookings();
+  const checkStatus = useCheckPaymentStatus();
 
   // Group bookings by eventId within the active tab
   const tabBookings = (allBookings ?? []).filter((b) => bookingTab(b) === tab);
@@ -389,6 +409,22 @@ export default function TicketsPage() {
     router.push(ROUTES.EVENT_DETAIL(booking.event.id));
   };
 
+  const handleCheckStatus = async (booking: ApiMyBooking) => {
+    setStatusNotice(null);
+    try {
+      const result = await checkStatus.mutateAsync(booking.id);
+      if (result.status === "CONFIRMED") {
+        setStatusNotice({ tone: "success", message: `Payment confirmed for ${result.ref} — your tickets are ready.` });
+      } else if (result.status === "FAILED" || result.status === "EXPIRED") {
+        setStatusNotice({ tone: "info", message: `${result.ref} did not complete — you can book again.` });
+      } else {
+        setStatusNotice({ tone: "info", message: `${result.ref} is still awaiting payment.` });
+      }
+    } catch {
+      setStatusNotice({ tone: "info", message: "Could not check status right now — please try again." });
+    }
+  };
+
   return (
     <div className="flex flex-col">
       {/* Top bar — mobile only */}
@@ -427,6 +463,9 @@ export default function TicketsPage() {
 
         {/* Booking list */}
         <div className="pt-4 pb-8 flex flex-col gap-4">
+          {statusNotice && (
+            <AlertBanner tone={statusNotice.tone} message={statusNotice.message} />
+          )}
           {isLoading ? (
             Array.from({ length: 2 }).map((_, i) => (
               <SkeletonCard key={i} className="h-[160px]" />
@@ -468,6 +507,8 @@ export default function TicketsPage() {
                 bookings={bookings}
                 onResume={handleResume}
                 onRetry={handleRetry}
+                onCheckStatus={handleCheckStatus}
+                checkingBookingId={checkStatus.isPending ? checkStatus.variables ?? null : null}
               />
             ))
           )}
