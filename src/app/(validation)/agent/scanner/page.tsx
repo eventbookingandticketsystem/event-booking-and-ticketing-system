@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signOut } from "next-auth/react";
 import { Icon } from "@/components/Shared/Icon";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
@@ -431,7 +430,6 @@ export default function ScannerPage() {
   const [lookup,      setLookup]      = useState<LookupOutcome | null>(null);
   const [result,      setResult]      = useState<ScanResult | null>(null);
   const [admitting,   setAdmitting]   = useState(false);
-  const [menuOpen,    setMenuOpen]    = useState(false);
 
   const scanMutation   = useScan();
   const lookupMutation = useScanLookup();
@@ -585,97 +583,42 @@ export default function ScannerPage() {
   return (
     <div className="h-full bg-brand-navy flex flex-col md:flex-row overflow-hidden relative">
 
-      {/* ── Sidebar (desktop nav) ── */}
-      <aside className="hidden md:flex flex-col w-64 shrink-0 border-r border-white/8 bg-brand-navy-2/60 p-5 gap-6">
-        <div className="flex items-center gap-3">
-          <span className="w-9 h-9 rounded-md bg-brand-orange inline-flex items-center justify-center shrink-0">
-            <Icon name="ScanLine" size={18} className="text-white" />
-          </span>
-          <span className="font-display font-bold text-[16px] text-white">Tiketi Gate</span>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-white/40 mb-1">Event</div>
-          <div className="text-white font-semibold text-[14px] leading-snug">{eventTitle}</div>
-          <div className="text-white/40 text-[12px] mt-0.5">Gate {gate}</div>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-white/50">Admitted</span>
-            <span className="font-mono font-bold text-white text-[20px]">{admitted}</span>
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-white/50">Status</span>
-            <span className={cn(
-              "flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded-pill",
-              online ? "bg-status-success-bg text-status-success" : "bg-status-warning-bg text-status-warning"
-            )}>
-              <Icon name={online ? "Wifi" : "WifiOff"} size={11} />
-              {online ? "Online" : "Offline"}
-            </span>
-          </div>
-        </div>
-
-        <div className="mt-auto flex flex-col gap-1">
-          {[
-            { icon: "Wallet" as const,  label: "Cash entry",   action: () => router.push(cashEntryUrl) },
-            { icon: "House"  as const,  label: "Home",         action: () => router.push(ROUTES.HOME)  },
-            { icon: "LogOut" as const,  label: "Sign out",     action: () => signOut({ redirect: true, callbackUrl: "/login" }) },
-          ].map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              onClick={item.action}
-              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-[13px] font-medium text-white/60 hover:bg-white/8 hover:text-white transition-colors"
-            >
-              <Icon name={item.icon} size={16} />
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </aside>
-
-      {/* ── Mobile top bar ── */}
-      <div className="md:hidden flex items-center justify-between h-10 px-4 shrink-0 border-b border-white/8 bg-brand-navy-2/60">
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <Icon name="Ticket" size={13} className="text-brand-orange shrink-0" />
-          <span className="text-white/70 text-xs truncate">{eventTitle} · Gate {gate}</span>
-        </div>
-        <span className="font-mono text-white text-xs px-1 shrink-0">
-          {admitted} <span className="text-white/40">in</span>
-        </span>
-        <button
-          type="button"
-          onClick={() => setOnline((o) => !o)}
-          className={cn(
-            "flex items-center gap-1 px-2 py-0.5 rounded-pill text-[11px] font-semibold shrink-0 ml-2",
-            online ? "bg-status-success-bg text-status-success" : "bg-status-warning-bg text-status-warning",
-          )}
-        >
-          <Icon name={online ? "Wifi" : "WifiOff"} size={11} />
-          {online ? "Online" : "Offline"}
-        </button>
-        <button
-          type="button"
-          onClick={() => setMenuOpen((m) => !m)}
-          className="w-7 h-7 ml-1 rounded-full inline-flex items-center justify-center text-white/60 hover:bg-white/10"
-        >
-          <Icon name="Ellipsis" size={16} />
-        </button>
-      </div>
-
       {/* ── Viewfinder area ── */}
       <div className="flex-1 flex flex-col items-center justify-center gap-5 relative overflow-hidden p-4 md:p-8">
 
-        {/* Desktop stat strip */}
-        <div className="hidden md:flex items-center gap-6 w-full max-w-lg mb-2">
-          <div className="flex flex-col">
-            <span className="text-white/40 text-[11px] uppercase tracking-wider">Admitted</span>
-            <span className="font-mono text-white font-bold text-[28px]">{admitted}</span>
+        {/* Stat strip — event context, admitted count, online toggle, cash-entry shortcut */}
+        <div className="flex items-center gap-3 w-full max-w-lg mb-1 md:mb-2 flex-wrap">
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-white/70 text-[13px] md:text-[11px] md:uppercase md:tracking-wider font-semibold md:font-normal truncate">
+              {eventTitle} <span className="text-white/40 font-normal">· Gate {gate}</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="flex items-center gap-1.5 text-white/50 text-[12px]">
+              Admitted <span className="font-mono font-bold text-white text-[16px] md:text-[20px]">{admitted}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setOnline((o) => !o)}
+              className={cn(
+                "flex items-center gap-1 px-2 py-0.5 rounded-pill text-[11px] font-semibold shrink-0",
+                online ? "bg-status-success-bg text-status-success" : "bg-status-warning-bg text-status-warning",
+              )}
+            >
+              <Icon name={online ? "Wifi" : "WifiOff"} size={11} />
+              {online ? "Online" : "Offline"}
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push(cashEntryUrl)}
+              aria-label="Cash entry"
+              className="w-7 h-7 rounded-full inline-flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition-colors shrink-0"
+            >
+              <Icon name="Wallet" size={15} />
+            </button>
           </div>
           {lookingUp && (
-            <span className="flex items-center gap-2 text-brand-orange text-sm font-semibold animate-pulse">
+            <span className="flex items-center gap-2 text-brand-orange text-sm font-semibold animate-pulse w-full">
               <Icon name="ScanLine" size={14} />
               Looking up…
             </span>
@@ -804,33 +747,6 @@ export default function ScannerPage() {
           onCancel={handleCancel}
           onScanAnother={handleScanAnother}
         />
-      )}
-
-      {/* ── Mobile dropdown menu ── */}
-      {menuOpen && (
-        <>
-          <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} aria-hidden="true" />
-          <div className="absolute top-12 right-2 z-40 w-52 bg-surface border border-border rounded-xl shadow-pop overflow-hidden md:hidden">
-            {[
-              { icon: "Wallet"  as const, label: "Cash entry", action: () => router.push(cashEntryUrl) },
-              { icon: "House"   as const, label: "Home",        action: () => router.push(ROUTES.HOME)  },
-              { icon: "LogOut"  as const, label: "Sign out",    action: () => signOut({ redirect: true, callbackUrl: "/login" }) },
-            ].map((item, i) => (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => { setMenuOpen(false); item.action(); }}
-                className={cn(
-                  "flex items-center gap-3 w-full px-4 py-3.5 text-left text-[15px] font-medium text-text hover:bg-surface-bg transition-colors",
-                  i > 0 && "border-t border-border",
-                )}
-              >
-                <Icon name={item.icon} size={18} className="text-text-secondary shrink-0" />
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </>
       )}
 
       {/* ── Start-scanning confirmation modal ── */}
