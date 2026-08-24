@@ -77,12 +77,32 @@ export const authOptions: NextAuthOptions = {
               ...(phone ? [{ phone }] : []),
             ],
           },
+          include: { orgProfile: true },
         });
 
+        // No matching account — same generic outcome as a wrong password,
+        // so a login attempt can never be used to enumerate deleted/unknown accounts.
         if (!user?.password) return null;
 
         const valid = await bcrypt.compare(password, user.password);
         if (!valid) return null;
+
+        // Suspended organizer: OrgProfile.status is the source of truth for organizers.
+        if (user.role === "ORGANIZER" && user.orgProfile?.status === "Suspended") {
+          throw new Error("AccountSuspended");
+        }
+
+        // Deactivated gate agent: blocked only if EVERY event assignment is INACTIVE
+        // (an agent with at least one active assignment may still sign in).
+        if (user.role === "GATE_AGENT") {
+          const assignments = await prisma.gateAgent.findMany({
+            where:  { userId: user.id },
+            select: { status: true },
+          });
+          if (assignments.length > 0 && assignments.every((a) => a.status === "INACTIVE")) {
+            throw new Error("AccountSuspended");
+          }
+        }
 
         return user;
       },
