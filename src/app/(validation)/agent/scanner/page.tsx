@@ -9,7 +9,9 @@ import { Icon } from "@/components/Shared/Icon";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
 import { useScan } from "@/lib/api/hooks/useScan";
+import { useScanLookup } from "@/lib/api/hooks/useScanLookup";
 import type { ScanOutcome } from "@/lib/api/hooks/useScan";
+import type { LookupOutcome } from "@/lib/api/hooks/useScanLookup";
 
 type ResultKind = "admit" | "used" | "invalid" | "wrong" | "expired";
 type CamState   = "requesting" | "active" | "denied" | "unavailable";
@@ -61,19 +63,74 @@ const RESULT_CONFIG: Record<ResultKind, {
   expired: { bg: "#1a2030", icon: "Clock",         verdict: "TICKET EXPIRED"                 },
 };
 
+// ── Start-scanning confirmation modal ───────────────────────────────────────
+
+function StartScanModal({
+  eventTitle,
+  gate,
+  onConfirm,
+  onCancel,
+}: {
+  eventTitle: string;
+  gate: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="start-scan-title"
+    >
+      <div className="w-full max-w-sm rounded-2xl bg-brand-navy-2 border border-white/10 p-6 flex flex-col items-center gap-4 text-center shadow-2xl">
+        <span className="w-14 h-14 rounded-full bg-brand-orange/15 border border-brand-orange/30 inline-flex items-center justify-center">
+          <Icon name="ScanLine" size={26} className="text-brand-orange" />
+        </span>
+        <div>
+          <h2 id="start-scan-title" className="font-display font-bold text-white text-[19px]">
+            Ready to scan?
+          </h2>
+          <p className="text-white/50 text-sm mt-1.5 leading-snug">
+            You&apos;re about to start scanning tickets for{" "}
+            <span className="text-white/80 font-semibold">{eventTitle}</span> at Gate {gate}.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 w-full mt-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 h-11 rounded-xl text-[14px] font-semibold text-white/60 border border-white/10 hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="flex-1 h-11 rounded-xl text-[14px] font-bold text-white bg-brand-orange hover:bg-brand-orange-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange flex items-center justify-center gap-2"
+          >
+            <Icon name="ScanLine" size={16} />
+            Start scanning
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Scanning progress overlay ──────────────────────────────────────────────
 
-function ScanningOverlay() {
+function ScanningOverlay({ label }: { label: string }) {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-black/70 backdrop-blur-sm">
       <div className="w-16 h-16 rounded-full border-4 border-brand-orange/30 border-t-brand-orange animate-spin" />
-      <p className="text-white font-semibold text-[16px]">Verifying ticket…</p>
+      <p className="text-white font-semibold text-[16px]">{label}</p>
       <p className="text-white/50 text-sm">Checking against system records</p>
     </div>
   );
 }
 
-// ── Result overlay ─────────────────────────────────────────────────────────
+// ── Result overlay (after an actual admit / a rejected lookup) ─────────────
 
 function ResultOverlay({ result, onReset }: { result: ScanResult; onReset: () => void }) {
   const cfg = RESULT_CONFIG[result.kind];
@@ -156,6 +213,200 @@ function ResultOverlay({ result, onReset }: { result: ScanResult; onReset: () =>
   );
 }
 
+// ── Review sidebar — shown after a successful (non-mutating) lookup ───────
+
+function fmtDateTime(iso: string) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleString("en-US", {
+    weekday: "short", month: "short", day: "numeric",
+    hour: "numeric", minute: "2-digit",
+  });
+}
+
+function ReviewSidebar({
+  lookup,
+  gate,
+  admitting,
+  onAdmit,
+  onCancel,
+  onScanAnother,
+}: {
+  lookup: LookupOutcome;
+  gate: string;
+  admitting: boolean;
+  onAdmit: () => void;
+  onCancel: () => void;
+  onScanAnother: () => void;
+}) {
+  const isValid = lookup.valid;
+
+  return (
+    <>
+      {/* Backdrop on mobile so the sidebar reads as a sheet */}
+      <div
+        className="fixed inset-0 z-30 bg-black/50 md:hidden"
+        onClick={onCancel}
+        aria-hidden="true"
+      />
+      <aside
+        className="fixed md:static inset-y-0 right-0 z-40 w-full max-w-sm md:max-w-none md:w-96 shrink-0 bg-brand-navy-2 border-l border-white/10 flex flex-col overflow-hidden"
+        role="region"
+        aria-label="Scanned ticket details"
+      >
+        {/* Header */}
+        <div
+          className="shrink-0 px-5 py-4 border-b border-white/8 flex items-center gap-3"
+          style={{ background: isValid ? "rgba(26,122,74,0.15)" : "rgba(163,45,45,0.15)" }}
+        >
+          <span
+            className="w-9 h-9 rounded-full inline-flex items-center justify-center shrink-0"
+            style={{ background: isValid ? "#1A7A4A" : "#A32D2D" }}
+          >
+            <Icon name={isValid ? "CircleCheck" : "TriangleAlert"} size={18} className="text-white" />
+          </span>
+          <div className="min-w-0">
+            <div className="text-white font-display font-bold text-[15px]">
+              {isValid ? "Valid ticket" : "Cannot admit"}
+            </div>
+            <div className="text-white/50 text-[12px] truncate">
+              {isValid ? lookup.ticket.ticketRef : lookup.message}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-5">
+          {isValid ? (
+            <>
+              {/* Attendee */}
+              <section className="flex flex-col gap-2.5">
+                <h3 className="text-[11px] font-semibold uppercase tracking-[0.8px] text-white/40">Customer</h3>
+                <div className="flex items-center gap-3">
+                  <span className="w-10 h-10 rounded-full bg-brand-orange/20 text-brand-orange inline-flex items-center justify-center font-bold text-[14px] shrink-0">
+                    {(lookup.attendee.name ?? "?").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-white font-semibold text-[15px] truncate">
+                      {lookup.attendee.name ?? "Guest"}
+                    </div>
+                    {lookup.attendee.phone && (
+                      <div className="text-white/50 text-[12px] flex items-center gap-1 truncate">
+                        <Icon name="Phone" size={11} className="shrink-0" />
+                        {lookup.attendee.phone}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {lookup.attendee.email && (
+                  <div className="text-white/50 text-[12px] flex items-center gap-1.5 truncate">
+                    <Icon name="Mail" size={11} className="shrink-0" />
+                    {lookup.attendee.email}
+                  </div>
+                )}
+              </section>
+
+              {/* Ticket */}
+              <section className="flex flex-col gap-2.5 pt-4 border-t border-white/8">
+                <h3 className="text-[11px] font-semibold uppercase tracking-[0.8px] text-white/40">Ticket</h3>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-white/50">Tier</span>
+                  <span className="px-3 py-1 rounded-full border border-white/20 text-white text-[12px] font-semibold">
+                    {lookup.ticket.tier}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-white/50">Reference</span>
+                  <span className="font-mono text-white text-[13px]">{lookup.ticket.ticketRef}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-white/50">Booking</span>
+                  <span className="font-mono text-white text-[13px]">{lookup.booking.ref}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-white/50">Paid via</span>
+                  <span className="text-white text-[13px]">{lookup.booking.method}</span>
+                </div>
+              </section>
+
+              {/* Event */}
+              <section className="flex flex-col gap-2.5 pt-4 border-t border-white/8">
+                <h3 className="text-[11px] font-semibold uppercase tracking-[0.8px] text-white/40">Event</h3>
+                <div className="flex items-start gap-2 text-sm">
+                  <Icon name="Ticket" size={14} className="text-white/40 shrink-0 mt-0.5" />
+                  <span className="text-white font-semibold">{lookup.event.title}</span>
+                </div>
+                <div className="flex items-start gap-2 text-sm">
+                  <Icon name="MapPin" size={14} className="text-white/40 shrink-0 mt-0.5" />
+                  <span className="text-white/70">{lookup.event.venue}, {lookup.event.city}</span>
+                </div>
+                <div className="flex items-start gap-2 text-sm">
+                  <Icon name="Calendar" size={14} className="text-white/40 shrink-0 mt-0.5" />
+                  <span className="text-white/70">{fmtDateTime(lookup.event.date)}</span>
+                </div>
+                <div className="flex items-start gap-2 text-sm">
+                  <Icon name="DoorOpen" size={14} className="text-white/40 shrink-0 mt-0.5" />
+                  <span className="text-white/70">Gate {gate}</span>
+                </div>
+              </section>
+            </>
+          ) : (
+            <div className="flex flex-col items-center text-center gap-3 py-8">
+              <Icon name="Ban" size={36} className="text-white/25" />
+              <p className="text-white/60 text-sm max-w-[220px]">{lookup.message}</p>
+              {lookup.result === "ALREADY_USED" && lookup.usedAt && (
+                <p className="text-white/35 text-xs">
+                  First scanned {fmtDateTime(lookup.usedAt)}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="shrink-0 px-5 py-4 border-t border-white/8 flex flex-col gap-2.5">
+          {isValid && (
+            <button
+              type="button"
+              onClick={onAdmit}
+              disabled={admitting}
+              className="h-12 rounded-xl bg-status-success text-white font-display font-bold text-[15px] flex items-center justify-center gap-2 hover:brightness-110 transition-all disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            >
+              {admitting ? (
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+              ) : (
+                <Icon name="CircleCheck" size={18} />
+              )}
+              {admitting ? "Admitting…" : "Admit"}
+            </button>
+          )}
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={admitting}
+              className="flex-1 h-11 rounded-xl text-[13px] font-semibold text-white/60 border border-white/10 hover:bg-white/5 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onScanAnother}
+              disabled={admitting}
+              className="flex-1 h-11 rounded-xl text-[13px] font-semibold text-white border border-white/15 hover:bg-white/8 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange flex items-center justify-center gap-1.5"
+            >
+              <Icon name="ScanLine" size={14} />
+              Scan another
+            </button>
+          </div>
+        </div>
+      </aside>
+    </>
+  );
+}
+
 // ── Main Scanner Page ──────────────────────────────────────────────────────
 
 export default function ScannerPage() {
@@ -165,21 +416,25 @@ export default function ScannerPage() {
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const streamRef    = useRef<MediaStream | null>(null);
   const scanLoopRef  = useRef<number | null>(null);
-  const lastPayload  = useRef<string>("");   // debounce: don't re-scan same code twice
+  const lastPayload  = useRef<string>("");   // debounce: don't re-look-up same code twice
 
   const agentId    = searchParams.get("agentId")    ?? "";
   const eventId    = searchParams.get("eventId")    ?? "";
   const gate       = searchParams.get("gate")       ?? "A";
   const eventTitle = searchParams.get("eventTitle") ?? searchParams.get("eventId") ?? "Current Event";
 
+  const [armed,       setArmed]       = useState(false);   // confirmed + camera allowed to run
   const [camState,    setCamState]    = useState<CamState>("requesting");
   const [online,      setOnline]      = useState(true);
   const [admitted,    setAdmitted]    = useState(0);
+  const [lookingUp,   setLookingUp]   = useState(false);
+  const [lookup,      setLookup]      = useState<LookupOutcome | null>(null);
   const [result,      setResult]      = useState<ScanResult | null>(null);
-  const [scanning,    setScanning]    = useState(false);
+  const [admitting,   setAdmitting]   = useState(false);
   const [menuOpen,    setMenuOpen]    = useState(false);
 
-  const scanMutation = useScan();
+  const scanMutation   = useScan();
+  const lookupMutation = useScanLookup();
 
   // ── Camera ────────────────────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
@@ -208,35 +463,36 @@ export default function ScannerPage() {
     }
   }, []);
 
+  // Camera only activates once the agent confirms the start-scanning modal.
   useEffect(() => {
+    if (!armed) return;
     startCamera();
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
       if (scanLoopRef.current) cancelAnimationFrame(scanLoopRef.current);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [armed]);
 
-  // ── Real scan ─────────────────────────────────────────────────────────────
-  const fireRealScan = useCallback(async (qrPayload: string) => {
-    if (!agentId || !eventId) return;   // no context — do nothing (no demo mode)
-    if (scanning) return;
-    setScanning(true);
+  // ── Read-only lookup (no mutation, no ScanRecord) ──────────────────────────
+  const fireLookup = useCallback(async (qrPayload: string) => {
+    if (!eventId) return;   // no context — do nothing (no demo mode)
+    if (lookingUp) return;
+    setLookingUp(true);
     try {
-      const outcome = await scanMutation.mutateAsync({ qrPayload, eventId, gate, agentId });
-      const r = outcomeToResult(outcome, eventTitle, gate);
-      setResult(r);
-      if (r.kind === "admit") setAdmitted((a) => a + 1);
+      const outcome = await lookupMutation.mutateAsync({ qrPayload, eventId });
+      setLookup(outcome);
     } catch {
-      setResult({ kind: "invalid", sub: "Network error — could not verify", eventTitle, gate });
+      setLookup({ valid: false, result: "INVALID", message: "Network error — could not verify" });
     } finally {
-      setScanning(false);
+      setLookingUp(false);
     }
-  }, [agentId, eventId, gate, eventTitle, scanning, scanMutation]);
+  }, [eventId, lookingUp, lookupMutation]);
 
-  // ── jsQR camera loop ──────────────────────────────────────────────────────
+  // ── jsQR camera loop — runs while armed, no active lookup/result open ─────
   useEffect(() => {
-    if (camState !== "active" || result || scanning) return;
+    if (!armed || camState !== "active" || lookup || result || lookingUp) return;
 
     let active = true;
 
@@ -262,9 +518,7 @@ export default function ScannerPage() {
           });
           if (code && code.data && code.data !== lastPayload.current) {
             lastPayload.current = code.data;
-            await fireRealScan(code.data);
-            // reset debounce after 3 s so the same code can be re-scanned
-            setTimeout(() => { lastPayload.current = ""; }, 3000);
+            await fireLookup(code.data);
             return;
           }
         }
@@ -277,9 +531,49 @@ export default function ScannerPage() {
       active = false;
       if (scanLoopRef.current) cancelAnimationFrame(scanLoopRef.current);
     };
-  }, [camState, result, scanning, fireRealScan]);
+  }, [armed, camState, lookup, result, lookingUp, fireLookup]);
 
-  const handleReset = () => {
+  // ── Sidebar actions ─────────────────────────────────────────────────────────
+  const handleAdmit = async () => {
+    // Reuse the exact raw QR string captured at scan time — the real /api/scan
+    // route matches on the full { ticketRef, qrPayload } pair, so a reconstructed
+    // payload (without the embedded userId) would never match.
+    const rawPayload = lastPayload.current;
+    if (!lookup?.valid || !agentId || !rawPayload) return;
+    setAdmitting(true);
+    try {
+      const outcome = await scanMutation.mutateAsync({
+        qrPayload: rawPayload,
+        eventId,
+        gate,
+        agentId,
+      });
+      const r = outcomeToResult(outcome, eventTitle, gate);
+      setLookup(null);
+      setResult(r);
+      if (r.kind === "admit") setAdmitted((a) => a + 1);
+    } catch {
+      setLookup(null);
+      setResult({ kind: "invalid", sub: "Network error — could not admit", eventTitle, gate });
+    } finally {
+      setAdmitting(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setLookup(null);
+    lastPayload.current = "";
+  };
+
+  const handleScanAnother = () => {
+    setLookup(null);
+    lastPayload.current = "";
+    // Debounce window so the same physical ticket isn't instantly re-picked-up
+    // if it's still in frame.
+    setTimeout(() => { lastPayload.current = ""; }, 300);
+  };
+
+  const handleResultReset = () => {
     setResult(null);
     lastPayload.current = "";
   };
@@ -291,7 +585,7 @@ export default function ScannerPage() {
   return (
     <div className="h-full bg-brand-navy flex flex-col md:flex-row overflow-hidden relative">
 
-      {/* ── Sidebar (desktop) ── */}
+      {/* ── Sidebar (desktop nav) ── */}
       <aside className="hidden md:flex flex-col w-64 shrink-0 border-r border-white/8 bg-brand-navy-2/60 p-5 gap-6">
         <div className="flex items-center gap-3">
           <span className="w-9 h-9 rounded-md bg-brand-orange inline-flex items-center justify-center shrink-0">
@@ -380,10 +674,10 @@ export default function ScannerPage() {
             <span className="text-white/40 text-[11px] uppercase tracking-wider">Admitted</span>
             <span className="font-mono text-white font-bold text-[28px]">{admitted}</span>
           </div>
-          {scanning && (
+          {lookingUp && (
             <span className="flex items-center gap-2 text-brand-orange text-sm font-semibold animate-pulse">
               <Icon name="ScanLine" size={14} />
-              Verifying…
+              Looking up…
             </span>
           )}
         </div>
@@ -405,14 +699,22 @@ export default function ScannerPage() {
             autoPlay
             className={cn(
               "absolute inset-0 w-full h-full object-cover transition-opacity duration-300",
-              camState === "active" ? "opacity-100" : "opacity-0",
+              armed && camState === "active" ? "opacity-100" : "opacity-0",
             )}
           />
           {/* Hidden canvas for jsQR frame extraction */}
           <canvas ref={canvasRef} className="hidden" aria-hidden="true" />
 
+          {/* Not-yet-armed state — waiting on the confirmation modal */}
+          {!armed && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 z-10">
+              <Icon name="ScanLine" size={32} className="text-white/20" />
+              <p className="text-white/40 text-sm text-center">Confirm to activate the camera</p>
+            </div>
+          )}
+
           {/* Camera state overlays */}
-          {camState !== "active" && (
+          {armed && camState !== "active" && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 z-10">
               {camState === "requesting" && (
                 <>
@@ -445,7 +747,7 @@ export default function ScannerPage() {
           )}
 
           {/* Animated scan line */}
-          {camState === "active" && (
+          {armed && camState === "active" && !lookup && !lookingUp && (
             <div
               className="absolute left-4 right-4 h-0.5 rounded-full z-20 pointer-events-none"
               style={{
@@ -482,6 +784,8 @@ export default function ScannerPage() {
         <p className="text-white/40 text-sm text-center">
           {!agentId
             ? "No event context — go back and select an event"
+            : !armed
+            ? "Confirm the prompt to start scanning"
             : camState === "active"
             ? "Point camera at a ticket QR code — detection is automatic"
             : camState === "denied"
@@ -489,6 +793,18 @@ export default function ScannerPage() {
             : "Camera unavailable"}
         </p>
       </div>
+
+      {/* ── Review sidebar (right) — shown after a lookup resolves ── */}
+      {lookup && (
+        <ReviewSidebar
+          lookup={lookup}
+          gate={gate}
+          admitting={admitting}
+          onAdmit={handleAdmit}
+          onCancel={handleCancel}
+          onScanAnother={handleScanAnother}
+        />
+      )}
 
       {/* ── Mobile dropdown menu ── */}
       {menuOpen && (
@@ -517,11 +833,21 @@ export default function ScannerPage() {
         </>
       )}
 
-      {/* ── Scanning progress overlay ── */}
-      {scanning && <ScanningOverlay />}
+      {/* ── Start-scanning confirmation modal ── */}
+      {!armed && agentId && (
+        <StartScanModal
+          eventTitle={eventTitle}
+          gate={gate}
+          onConfirm={() => setArmed(true)}
+          onCancel={() => router.push(ROUTES.AGENT)}
+        />
+      )}
 
-      {/* ── Result overlay ── */}
-      {result && <ResultOverlay result={result} onReset={handleReset} />}
+      {/* ── Looking-up overlay ── */}
+      {lookingUp && <ScanningOverlay label="Looking up ticket…" />}
+
+      {/* ── Post-admit result overlay ── */}
+      {result && <ResultOverlay result={result} onReset={handleResultReset} />}
 
       <style>{`
         @keyframes scanline {
