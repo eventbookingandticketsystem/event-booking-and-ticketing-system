@@ -42,6 +42,7 @@ export interface ScanRecord {
 }
 
 export interface DashboardData {
+  eventId: string | null; // null when this is the "all events" aggregate
   eventName: string;
   admitted: number;
   capacity: number;
