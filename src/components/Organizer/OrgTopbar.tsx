@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/Shared/Icon";
 
 export interface UserMini {
@@ -7,10 +8,20 @@ export interface UserMini {
   image: string | null;
 }
 
+export interface EventOption {
+  id: string;
+  name: string;
+}
+
 interface OrgTopbarProps {
   crumb: string;
   eventName?: string;
-  onEvent?: () => void;
+  /** All of the organizer's events, for the switcher dropdown. */
+  events?: EventOption[];
+  /** Currently selected event id, or null/undefined for "All events". */
+  selectedEventId?: string | null;
+  /** Called with the chosen event id, or null when "All events" is picked. */
+  onSelectEvent?: (eventId: string | null) => void;
   user?: UserMini | null;
 }
 
@@ -21,7 +32,38 @@ export function initials(name: string | null | undefined): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export function OrgTopbar({ crumb, eventName, onEvent, user }: OrgTopbarProps) {
+export function OrgTopbar({
+  crumb,
+  eventName,
+  events,
+  selectedEventId,
+  onSelectEvent,
+  user,
+}: OrgTopbarProps) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClickAway(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickAway);
+    document.addEventListener("keydown", onEscape);
+    return () => {
+      document.removeEventListener("mousedown", onClickAway);
+      document.removeEventListener("keydown", onEscape);
+    };
+  }, [open]);
+
+  const hasSwitcher = !!events && !!onSelectEvent;
+  const label = eventName ?? "All events";
+
   return (
     <header className="h-14 bg-surface border-b border-border flex items-center justify-between px-6 sticky top-0 z-20 shrink-0">
       {/* Breadcrumb */}
@@ -33,17 +75,68 @@ export function OrgTopbar({ crumb, eventName, onEvent, user }: OrgTopbarProps) {
 
       {/* Right side */}
       <div className="flex items-center gap-3">
-        {eventName && onEvent && (
-          <button
-            type="button"
-            onClick={onEvent}
-            aria-label={`Selected event: ${eventName}`}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border bg-surface-bg text-sm text-text hover:border-brand-orange/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
-          >
-            <Icon name="Calendar" size={15} className="text-text-secondary" />
-            <span className="font-medium">{eventName}</span>
-            <Icon name="ChevronDown" size={14} className="text-text-secondary" />
-          </button>
+        {hasSwitcher && (
+          <div className="relative" ref={wrapRef}>
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-haspopup="listbox"
+              aria-expanded={open}
+              aria-label={`Selected event: ${label}`}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border bg-surface-bg text-sm text-text hover:border-brand-orange/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange"
+            >
+              <Icon name="Calendar" size={15} className="text-text-secondary" />
+              <span className="font-medium max-w-50 truncate">{label}</span>
+              <Icon name="ChevronDown" size={14} className="text-text-secondary" />
+            </button>
+
+            {open && (
+              <ul
+                role="listbox"
+                aria-label="Switch event"
+                className="absolute right-0 top-full mt-1.5 w-64 max-h-80 overflow-y-auto bg-surface border border-border rounded-md shadow-lg py-1 z-30"
+              >
+                <li role="none">
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={!selectedEventId}
+                    onClick={() => {
+                      onSelectEvent!(null);
+                      setOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-surface-bg transition-colors flex items-center gap-2 ${
+                      !selectedEventId ? "text-brand-orange font-semibold" : "text-text"
+                    }`}
+                  >
+                    <Icon name="LayoutGrid" size={14} className="shrink-0" />
+                    <span className="truncate">All events</span>
+                  </button>
+                </li>
+                {events!.length > 0 && (
+                  <li role="none" className="my-1 border-t border-border" />
+                )}
+                {events!.map((ev) => (
+                  <li role="none" key={ev.id}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={selectedEventId === ev.id}
+                      onClick={() => {
+                        onSelectEvent!(ev.id);
+                        setOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-surface-bg transition-colors truncate ${
+                        selectedEventId === ev.id ? "text-brand-orange font-semibold" : "text-text"
+                      }`}
+                    >
+                      {ev.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
 
         {/* Role badge */}
