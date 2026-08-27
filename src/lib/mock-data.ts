@@ -224,6 +224,7 @@ export const MY_TICKETS: TicketType[] = [
 // ORGANIZER DASHBOARD — DASH
 // ============================================================
 export const DASH: DashboardData = {
+  eventId: "mock-event-1",
   eventName: "Juba Music Festival 2025",
   admitted: 1247,
   capacity: 2000,
