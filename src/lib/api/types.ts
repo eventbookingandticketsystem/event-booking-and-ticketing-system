@@ -200,6 +200,7 @@ export interface ApiTierBreakdown {
 
 /** Shape returned by GET /api/organizer/dashboard */
 export interface ApiOrgDashboard {
+  eventId: string | null; // null when this is the "all events" aggregate
   eventName: string;
   admitted: number;
   capacity: number;
