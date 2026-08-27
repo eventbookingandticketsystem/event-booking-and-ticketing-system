@@ -60,6 +60,7 @@ function adaptScan(s: ApiOrgDashboard["scans"][number]): ScanRecord {
 
 export function adaptOrgDashboard(raw: ApiOrgDashboard): DashboardData {
   return {
+    eventId:   raw.eventId,
     eventName: raw.eventName,
     admitted:  raw.admitted,
     capacity:  raw.capacity,
@@ -73,19 +74,20 @@ export function adaptOrgDashboard(raw: ApiOrgDashboard): DashboardData {
 }
 
 /**
- * GET /api/organizer/dashboard?eventId=…
+ * GET /api/organizer/dashboard[?eventId=…]
  *
  * Requires ORGANIZER role + valid session.
- * Returns undefined if eventId is empty (the screen shows "noevent" state).
+ * Pass eventId to view a single event's dashboard, or omit/null to fetch
+ * the aggregate "all events" overview.
  */
 export function useOrgDashboard(eventId: string | null | undefined) {
   return useQuery<DashboardData>({
-    queryKey: ["org-dashboard", eventId] as const,
-    enabled:  !!eventId,
+    queryKey: ["org-dashboard", eventId ?? "all"] as const,
     queryFn:  async () => {
-      const response = await apiClient.get<ApiResponse<ApiOrgDashboard>>(
-        `/organizer/dashboard?eventId=${encodeURIComponent(eventId!)}`,
-      );
+      const url = eventId
+        ? `/organizer/dashboard?eventId=${encodeURIComponent(eventId)}`
+        : `/organizer/dashboard`;
+      const response = await apiClient.get<ApiResponse<ApiOrgDashboard>>(url);
       return adaptOrgDashboard(response.data.data);
     },
   });
