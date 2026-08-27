@@ -16,29 +16,39 @@ import { useOrgDashboard } from "@/lib/api/hooks/useOrgDashboard";
 
 export default function OrgDashboardPage() {
   const [page, setPage] = useState(1);
+  // null = "All events" overview (default); otherwise a specific event id.
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
-  // Load this organiser's events; auto-select the first one
+  // Load this organiser's events for the switcher dropdown
   const { data: orgEvents } = useOrgEvents({ limit: 20 });
-  const effectiveEventId = orgEvents?.[0]?.id ?? null;
 
   const {
     data: dash,
     isLoading,
     isError,
     error,
-  } = useOrgDashboard(effectiveEventId);
+  } = useOrgDashboard(selectedEventId);
 
   const d = dash;
-  const admittedPct = d ? Math.round((d.admitted / d.capacity) * 100) : 0;
-  const lineData = d ? d.entryRate.map((pt) => ({ label: pt.t, value: pt.v })) : [];
-  const barData  = d ? d.tiers.map((t) => ({ label: t.name, value: t.count, color: t.color })) : [];
+  const admittedPct = d && d.capacity > 0 ? Math.round((d.admitted / d.capacity) * 100) : 0;
+  const lineData = d
+    ? d.entryRate.map((pt) => ({ label: pt.t, value: pt.v }))
+    : [];
+  const barData = d
+    ? d.tiers.map((t) => ({ label: t.name, value: t.count, color: t.color }))
+    : [];
 
   return (
     <div className="flex flex-col min-h-full">
-      <OrgTopbar crumb="Dashboard" eventName={d?.eventName} onEvent={() => {}} />
+      <OrgTopbar
+        crumb="Dashboard"
+        eventName={selectedEventId ? d?.eventName : undefined}
+        events={(orgEvents ?? []).map((e) => ({ id: e.id, name: e.name }))}
+        selectedEventId={selectedEventId}
+        onSelectEvent={setSelectedEventId}
+      />
 
       <div className="px-6 pt-5 pb-8 flex flex-col gap-6">
-
         {/* ── Error ── */}
         {isError && (
           <AlertBanner
@@ -57,7 +67,10 @@ export default function OrgDashboardPage() {
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="bg-surface border border-border rounded-lg p-5">
+                <div
+                  key={i}
+                  className="bg-surface border border-border rounded-lg p-5"
+                >
                   <div className="h-3 w-24 skeleton rounded mb-3" />
                   <div className="h-8 w-32 skeleton rounded mb-4" />
                   <div className="h-2 w-full skeleton rounded" />
@@ -71,12 +84,16 @@ export default function OrgDashboardPage() {
           </>
         )}
 
-        {/* ── No event yet (orgEvents still loading or organiser has none) ── */}
-        {!isLoading && !isError && !d && (
+        {/* ── No events at all (organiser has none published) ── */}
+        {!isLoading && !isError && d && orgEvents && orgEvents.length === 0 && (
           <>
             <div>
-              <h1 className="font-display font-bold text-[26px] text-text mb-0.5">Dashboard</h1>
-              <p className="text-sm text-text-secondary">Real-time gate attendance and revenue.</p>
+              <h1 className="font-display font-bold text-[26px] text-text mb-0.5">
+                Dashboard
+              </h1>
+              <p className="text-sm text-text-secondary">
+                Real-time gate attendance and revenue.
+              </p>
             </div>
             <div className="bg-surface border border-border rounded-lg p-6">
               <EmptyState
@@ -89,17 +106,17 @@ export default function OrgDashboardPage() {
         )}
 
         {/* ── Live data ── */}
-        {!isLoading && !isError && d && (
+        {!isLoading && !isError && d && !(orgEvents && orgEvents.length === 0) && (
           <>
             {/* Header */}
             <div>
               <h1 className="font-display font-bold text-[26px] text-text flex items-center gap-3 flex-wrap mb-0.5">
                 {d.eventName}
-                <StatusPill status="Live" />
+                {selectedEventId && <StatusPill status="Live" />}
               </h1>
               <p className="text-sm text-text-secondary flex items-center gap-1.5">
                 <Icon name="RefreshCw" size={13} className="text-text-muted" />
-                Live data
+                {selectedEventId ? "Live data" : `Aggregated across ${orgEvents?.length ?? 0} events`}
               </p>
             </div>
 
@@ -145,8 +162,12 @@ export default function OrgDashboardPage() {
             {/* Line chart */}
             <div className="bg-surface border border-border rounded-lg p-5">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-display font-semibold text-[17px] text-text m-0">Entry rate</h3>
-                <span className="text-sm text-text-muted">Admissions per 30 min</span>
+                <h3 className="font-display font-semibold text-[17px] text-text m-0">
+                  Entry rate
+                </h3>
+                <span className="text-sm text-text-muted">
+                  Admissions per 30 min
+                </span>
               </div>
               {lineData.length > 0 ? (
                 <LineChart data={lineData} />
@@ -159,7 +180,6 @@ export default function OrgDashboardPage() {
 
             {/* 2-col: tier breakdown + recent scans */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
               {/* Tier breakdown */}
               <div className="bg-surface border border-border rounded-lg p-5">
                 <h3 className="font-display font-semibold text-[17px] text-text mb-3 m-0">
@@ -177,7 +197,9 @@ export default function OrgDashboardPage() {
               {/* Recent scans */}
               <div className="bg-surface border border-border rounded-lg overflow-hidden">
                 <div className="px-5 py-4 border-b border-border">
-                  <h3 className="font-display font-semibold text-[17px] text-text m-0">Recent scans</h3>
+                  <h3 className="font-display font-semibold text-[17px] text-text m-0">
+                    Recent scans
+                  </h3>
                 </div>
 
                 {d.scans.length === 0 ? (
@@ -187,23 +209,49 @@ export default function OrgDashboardPage() {
                 ) : (
                   <>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-sm" aria-label="Recent scans">
+                      <table
+                        className="w-full text-sm"
+                        aria-label="Recent scans"
+                      >
                         <thead>
                           <tr className="border-b border-border bg-surface-bg">
-                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-text-secondary uppercase tracking-wide">Time</th>
-                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-text-secondary uppercase tracking-wide">Gate</th>
-                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-text-secondary uppercase tracking-wide">Ref</th>
-                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-text-secondary uppercase tracking-wide">Result</th>
+                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-text-secondary uppercase tracking-wide">
+                              Time
+                            </th>
+                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-text-secondary uppercase tracking-wide">
+                              Gate
+                            </th>
+                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-text-secondary uppercase tracking-wide">
+                              Ref
+                            </th>
+                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-text-secondary uppercase tracking-wide">
+                              Result
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
                           {d.scans.map((s, i) => (
-                            <tr key={i} className="border-b border-border/50 last:border-b-0 hover:bg-surface-bg/50">
-                              <td className="px-4 py-3 font-mono text-[13px]">{s.time}</td>
-                              <td className="px-4 py-3 text-text-secondary">{s.gate}</td>
-                              <td className="px-4 py-3 font-mono text-[12px] text-text-muted truncate max-w-22">{s.tier}</td>
+                            <tr
+                              key={i}
+                              className="border-b border-border/50 last:border-b-0 hover:bg-surface-bg/50"
+                            >
+                              <td className="px-4 py-3 font-mono text-[13px]">
+                                {s.time}
+                              </td>
+                              <td className="px-4 py-3 text-text-secondary">
+                                {s.gate}
+                              </td>
+                              <td className="px-4 py-3 font-mono text-[12px] text-text-muted truncate max-w-22">
+                                {s.tier}
+                              </td>
                               <td className="px-4 py-3">
-                                <StatusPill status={s.result === "ADMIT" ? "Admitted" : "Rejected"} />
+                                <StatusPill
+                                  status={
+                                    s.result === "ADMIT"
+                                      ? "Admitted"
+                                      : "Rejected"
+                                  }
+                                />
                               </td>
                             </tr>
                           ))}
@@ -259,7 +307,6 @@ export default function OrgDashboardPage() {
             </div>
           </>
         )}
-
       </div>
     </div>
   );
