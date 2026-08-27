@@ -6,9 +6,10 @@ import {
   unauthorized,
   forbidden,
   notFound,
-  badRequest,
   serverError,
 } from "@/lib/api-utils";
+
+type Tier = { id: string; name: string; capacity: number; remaining: number; soldOut: boolean };
 
 // ── Bucket admit scans into 30-minute windows ──────────────────────────────
 function buildEntryRate(
@@ -29,7 +30,89 @@ function buildEntryRate(
     .map(([t, v]) => ({ t, v }));
 }
 
-// ── GET /api/organizer/dashboard?eventId=… — ORGANIZER only ───────────────
+// ── Merge per-tier capacity/sold across events by tier name ────────────────
+function mergeTiers(tiers: Tier[]) {
+  const byName = new Map<string, { capacity: number; sold: number; remaining: number; soldOut: boolean }>();
+
+  for (const t of tiers) {
+    const sold = t.capacity - t.remaining;
+    const existing = byName.get(t.name);
+    if (existing) {
+      existing.capacity  += t.capacity;
+      existing.sold      += sold;
+      existing.remaining += t.remaining;
+      existing.soldOut    = existing.soldOut && t.soldOut;
+    } else {
+      byName.set(t.name, { capacity: t.capacity, sold, remaining: t.remaining, soldOut: t.soldOut });
+    }
+  }
+
+  return Array.from(byName.entries()).map(([name, v]) => ({ name, ...v }));
+}
+
+// ── Fetch dashboard metrics for a given event filter (single event or all owned events) ──
+async function fetchDashboardMetrics(eventFilter: { eventId?: string; eventIds?: string[] }) {
+  const where = eventFilter.eventId
+    ? { eventId: eventFilter.eventId }
+    : { eventId: { in: eventFilter.eventIds! } };
+  const bookingWhere = eventFilter.eventId
+    ? { eventId: eventFilter.eventId }
+    : { eventId: { in: eventFilter.eventIds! } };
+
+  const [
+    admitted,
+    fraud,
+    revenueAgg,
+    recentScans,
+    admitScans,
+  ] = await Promise.all([
+    prisma.ticket.count({
+      where: { ...where, status: "USED" },
+    }),
+
+    prisma.scanRecord.count({
+      where: { ...where, result: { not: "ADMIT" } },
+    }),
+
+    prisma.bookingLine.aggregate({
+      where: {
+        booking: { ...bookingWhere, status: "CONFIRMED" },
+      },
+      _sum: { subtotal: true },
+    }),
+
+    prisma.scanRecord.findMany({
+      where:   where,
+      orderBy: { scannedAt: "desc" },
+      take:    10,
+      select: {
+        id:        true,
+        result:    true,
+        scannedAt: true,
+        gate:      true,
+        ticketRef: true,
+      },
+    }),
+
+    prisma.scanRecord.findMany({
+      where:   { ...where, result: "ADMIT" },
+      select:  { scannedAt: true },
+      orderBy: { scannedAt: "asc" },
+    }),
+  ]);
+
+  return {
+    admitted,
+    fraud,
+    revenue:   revenueAgg._sum.subtotal ?? 0,
+    entryRate: buildEntryRate(admitScans),
+    scans:     recentScans,
+  };
+}
+
+// ── GET /api/organizer/dashboard[?eventId=…] — ORGANIZER only ─────────────
+// Omitting eventId returns an aggregate overview across all of the
+// organizer's events.
 export async function GET(req: NextRequest) {
   try {
     // 1. Role check
@@ -38,105 +121,87 @@ export async function GET(req: NextRequest) {
       return unauthorized("Organizer access required");
     }
 
-    // 2. Require eventId query param
     const { searchParams } = req.nextUrl;
     const eventId = searchParams.get("eventId");
-    if (!eventId) return badRequest("eventId is required");
 
-    // 3. Resolve organizer profile
+    // 2. Resolve organizer profile
     const orgProfile = await prisma.orgProfile.findUnique({
       where: { userId: token.id as string },
     });
     if (!orgProfile) return forbidden("Organizer profile not found");
 
-    // 4. Fetch event with tiers
-    const event = await prisma.event.findUnique({
-      where:   { id: eventId },
-      include: { tiers: true },
-    });
-    if (!event) return notFound("Event not found");
+    // ── Single event ──────────────────────────────────────────────────────
+    if (eventId) {
+      const event = await prisma.event.findUnique({
+        where:   { id: eventId },
+        include: { tiers: true },
+      });
+      if (!event) return notFound("Event not found");
 
-    // 5. Ownership check
-    if (event.orgProfileId !== orgProfile.id) {
-      return forbidden("You do not own this event");
+      if (event.orgProfileId !== orgProfile.id) {
+        return forbidden("You do not own this event");
+      }
+
+      const capacity = event.tiers.reduce((sum, t) => sum + t.capacity, 0);
+      const sold     = event.tiers.reduce((sum, t) => sum + (t.capacity - t.remaining), 0);
+      const metrics  = await fetchDashboardMetrics({ eventId });
+
+      const tiersBreakdown = event.tiers.map((t) => ({
+        name:      t.name,
+        capacity:  t.capacity,
+        sold:      t.capacity - t.remaining,
+        remaining: t.remaining,
+        soldOut:   t.soldOut,
+      }));
+
+      return ok({
+        eventId:   event.id,
+        eventName: event.title,
+        capacity,
+        sold,
+        tiers: tiersBreakdown,
+        ...metrics,
+      });
     }
 
-    // 6. Compute JS-side metrics from tiers
-    const capacity = event.tiers.reduce((sum, t) => sum + t.capacity,  0);
-    const sold     = event.tiers.reduce(
-      (sum, t) => sum + (t.capacity - t.remaining), 0,
+    // ── All events overview ──────────────────────────────────────────────
+    const events = await prisma.event.findMany({
+      where:   { orgProfileId: orgProfile.id },
+      include: { tiers: true },
+    });
+
+    if (events.length === 0) {
+      return ok({
+        eventId:   null,
+        eventName: "All events",
+        capacity:  0,
+        sold:      0,
+        admitted:  0,
+        fraud:     0,
+        revenue:   0,
+        entryRate: [],
+        tiers:     [],
+        scans:     [],
+      });
+    }
+
+    const eventIds = events.map((e) => e.id);
+    const capacity = events.reduce(
+      (sum, e) => sum + e.tiers.reduce((s, t) => s + t.capacity, 0), 0,
     );
-
-    // 7. Parallel DB metrics
-    const [
-      admitted,
-      fraud,
-      revenueAgg,
-      recentScans,
-      admitScans,
-    ] = await Promise.all([
-      // a. USED tickets for this event
-      prisma.ticket.count({
-        where: { eventId, status: "USED" },
-      }),
-
-      // b. Non-ADMIT scan records
-      prisma.scanRecord.count({
-        where: { eventId, result: { not: "ADMIT" } },
-      }),
-
-      // c. Revenue from CONFIRMED booking lines
-      prisma.bookingLine.aggregate({
-        where: {
-          booking: { eventId, status: "CONFIRMED" },
-        },
-        _sum: { subtotal: true },
-      }),
-
-      // d. Last 10 scan records
-      prisma.scanRecord.findMany({
-        where:   { eventId },
-        orderBy: { scannedAt: "desc" },
-        take:    10,
-        select: {
-          id:        true,
-          result:    true,
-          scannedAt: true,
-          gate:      true,
-          ticketRef: true,
-        },
-      }),
-
-      // e. All ADMIT scans for entry-rate bucketing
-      prisma.scanRecord.findMany({
-        where:   { eventId, result: "ADMIT" },
-        select:  { scannedAt: true },
-        orderBy: { scannedAt: "asc" },
-      }),
-    ]);
-
-    const revenue    = revenueAgg._sum.subtotal ?? 0;
-    const entryRate  = buildEntryRate(admitScans);
-
-    // 8. Tier breakdown (JS, no extra query)
-    const tiersBreakdown = event.tiers.map((t) => ({
-      name:      t.name,
-      capacity:  t.capacity,
-      sold:      t.capacity - t.remaining,
-      remaining: t.remaining,
-      soldOut:   t.soldOut,
-    }));
+    const sold = events.reduce(
+      (sum, e) => sum + e.tiers.reduce((s, t) => s + (t.capacity - t.remaining), 0), 0,
+    );
+    const metrics = await fetchDashboardMetrics({ eventIds });
+    const tiersBreakdown = mergeTiers(events.flatMap((e) => e.tiers));
 
     return ok({
-      eventName: event.title,
-      admitted,
+      eventId:   null,
+      eventName: "All events",
       capacity,
       sold,
-      fraud,
-      revenue,
-      entryRate,
       tiers: tiersBreakdown,
-      scans: recentScans,
+      ...metrics,
     });
   } catch (e) {
     return serverError(e);
