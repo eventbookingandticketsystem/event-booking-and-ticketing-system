@@ -45,6 +45,8 @@ function labelReason(r: string) {
     case "INVALID":     return "Invalid Ticket";
     case "WRONG_EVENT": return "Wrong Event";
     case "EXPIRED":     return "Expired";
+    case "TOO_EARLY":   return "Too Early";
+    case "EVENT_ENDED": return "Event Ended";
     case "REJECT":      return "Rejected";
     default:            return r;
   }
