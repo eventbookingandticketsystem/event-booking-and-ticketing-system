@@ -54,6 +54,8 @@ enum ScanResult {
   INVALID
   WRONG_EVENT
   EXPIRED
+  TOO_EARLY
+  EVENT_ENDED
 }
 
 enum AgentStatus {
