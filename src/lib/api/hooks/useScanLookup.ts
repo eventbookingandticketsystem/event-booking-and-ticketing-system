@@ -4,6 +4,14 @@ import type { ApiResponse } from "../types";
 
 // ── API response shapes — mirrors /api/scan/lookup ─────────────────────────
 
+export interface LookupEvent {
+  id:    string;
+  title: string;
+  venue: string;
+  city:  string;
+  date:  string;
+}
+
 export interface LookupValid {
   valid: true;
   ticket: {
@@ -15,14 +23,18 @@ export interface LookupValid {
   };
   attendee: { name: string | null; email: string | null; phone: string | null };
   booking:  { ref: string; total: number; method: string };
-  event:    { id: string; title: string; venue: string; city: string; date: string };
+  event:    LookupEvent;
 }
 
 interface LookupInvalid {
-  valid:   false;
-  result:  "ALREADY_USED" | "EXPIRED" | "WRONG_EVENT" | "INVALID";
-  message: string;
-  usedAt?: string | null;
+  valid:     false;
+  result:    "ALREADY_USED" | "EXPIRED" | "WRONG_EVENT" | "INVALID" | "TOO_EARLY" | "EVENT_ENDED";
+  message:   string;
+  usedAt?:   string | null;
+  opensAt?:  string;
+  closedAt?: string;
+  /** Present for every rejection except WRONG_EVENT and INVALID (no reliable event context yet). */
+  event?:    LookupEvent;
 }
 
 export type LookupOutcome = LookupValid | LookupInvalid;
