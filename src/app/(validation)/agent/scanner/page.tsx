@@ -12,7 +12,7 @@ import { useScanLookup } from "@/lib/api/hooks/useScanLookup";
 import type { ScanOutcome } from "@/lib/api/hooks/useScan";
 import type { LookupOutcome } from "@/lib/api/hooks/useScanLookup";
 
-type ResultKind = "admit" | "used" | "invalid" | "wrong" | "expired";
+type ResultKind = "admit" | "used" | "invalid" | "wrong" | "expired" | "too_early" | "event_ended";
 type CamState   = "requesting" | "active" | "denied" | "unavailable";
 
 interface ScanResult {
@@ -43,6 +43,15 @@ function outcomeToResult(o: ScanOutcome, eventTitle: string, gate: string): Scan
       return { kind: "expired", sub: o.message, eventTitle, gate, scannedAt };
     case "WRONG_EVENT":
       return { kind: "wrong", sub: o.message, eventTitle, gate, scannedAt };
+    case "TOO_EARLY": {
+      const d = new Date(o.opensAt);
+      const sub = !isNaN(d.getTime())
+        ? `Gate opens at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`
+        : o.message;
+      return { kind: "too_early", sub, eventTitle, gate, scannedAt };
+    }
+    case "EVENT_ENDED":
+      return { kind: "event_ended", sub: o.message, eventTitle, gate, scannedAt };
     case "INVALID":
     default:
       return { kind: "invalid", sub: o.message ?? "This ticket could not be verified", eventTitle, gate, scannedAt };
@@ -55,11 +64,13 @@ const RESULT_CONFIG: Record<ResultKind, {
   verdict: string;
   showName?: boolean;
 }> = {
-  admit:   { bg: "#1A7A4A", icon: "CircleCheck", verdict: "ADMIT",          showName: true  },
-  used:    { bg: "#A32D2D", icon: "X",            verdict: "ALREADY USED"                    },
-  invalid: { bg: "#A32D2D", icon: "X",            verdict: "INVALID TICKET"                  },
-  wrong:   { bg: "#7A4A00", icon: "TriangleAlert", verdict: "WRONG EVENT"                    },
-  expired: { bg: "#1a2030", icon: "Clock",         verdict: "TICKET EXPIRED"                 },
+  admit:       { bg: "#1A7A4A", icon: "CircleCheck", verdict: "ADMIT",          showName: true  },
+  used:        { bg: "#A32D2D", icon: "X",            verdict: "ALREADY USED"                    },
+  invalid:     { bg: "#A32D2D", icon: "X",            verdict: "INVALID TICKET"                  },
+  wrong:       { bg: "#7A4A00", icon: "TriangleAlert", verdict: "WRONG EVENT"                    },
+  expired:     { bg: "#1a2030", icon: "Clock",         verdict: "TICKET EXPIRED"                 },
+  too_early:   { bg: "#7A4A00", icon: "Clock",         verdict: "TOO EARLY"                      },
+  event_ended: { bg: "#1a2030", icon: "Clock",         verdict: "EVENT ENDED"                    },
 };
 
 // ── Start-scanning confirmation modal ───────────────────────────────────────
@@ -238,7 +249,9 @@ function ReviewSidebar({
   onCancel: () => void;
   onScanAnother: () => void;
 }) {
-  const isValid = lookup.valid;
+  const isValid  = lookup.valid;
+  const isTiming = !lookup.valid && (lookup.result === "TOO_EARLY" || lookup.result === "EVENT_ENDED");
+  const headerColor = isValid ? "#1A7A4A" : isTiming ? "#B8720A" : "#A32D2D";
 
   return (
     <>
@@ -256,17 +269,17 @@ function ReviewSidebar({
         {/* Header */}
         <div
           className="shrink-0 px-5 py-4 border-b border-white/8 flex items-center gap-3"
-          style={{ background: isValid ? "rgba(26,122,74,0.15)" : "rgba(163,45,45,0.15)" }}
+          style={{ background: `${headerColor}26` }}
         >
           <span
             className="w-9 h-9 rounded-full inline-flex items-center justify-center shrink-0"
-            style={{ background: isValid ? "#1A7A4A" : "#A32D2D" }}
+            style={{ background: headerColor }}
           >
-            <Icon name={isValid ? "CircleCheck" : "TriangleAlert"} size={18} className="text-white" />
+            <Icon name={isValid ? "CircleCheck" : isTiming ? "Clock" : "TriangleAlert"} size={18} className="text-white" />
           </span>
           <div className="min-w-0">
             <div className="text-white font-display font-bold text-[15px]">
-              {isValid ? "Valid ticket" : "Cannot admit"}
+              {isValid ? "Valid ticket" : isTiming ? "Not yet admissible" : "Cannot admit"}
             </div>
             <div className="text-white/50 text-[12px] truncate">
               {isValid ? lookup.ticket.ticketRef : lookup.message}
@@ -349,13 +362,53 @@ function ReviewSidebar({
               </section>
             </>
           ) : (
-            <div className="flex flex-col items-center text-center gap-3 py-8">
-              <Icon name="Ban" size={36} className="text-white/25" />
-              <p className="text-white/60 text-sm max-w-[220px]">{lookup.message}</p>
-              {lookup.result === "ALREADY_USED" && lookup.usedAt && (
-                <p className="text-white/35 text-xs">
-                  First scanned {fmtDateTime(lookup.usedAt)}
-                </p>
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col items-center text-center gap-3 py-4">
+                <Icon
+                  name={
+                    lookup.result === "TOO_EARLY" || lookup.result === "EVENT_ENDED"
+                      ? "Clock"
+                      : "Ban"
+                  }
+                  size={36}
+                  className="text-white/25"
+                />
+                <p className="text-white/60 text-sm max-w-55">{lookup.message}</p>
+                {lookup.result === "ALREADY_USED" && lookup.usedAt && (
+                  <p className="text-white/35 text-xs">
+                    First scanned {fmtDateTime(lookup.usedAt)}
+                  </p>
+                )}
+                {lookup.result === "TOO_EARLY" && lookup.opensAt && (
+                  <p className="text-white/35 text-xs">
+                    Gate opens {fmtDateTime(lookup.opensAt)}
+                  </p>
+                )}
+                {lookup.result === "EVENT_ENDED" && lookup.closedAt && (
+                  <p className="text-white/35 text-xs">
+                    Admission closed {fmtDateTime(lookup.closedAt)}
+                  </p>
+                )}
+              </div>
+
+              {/* Event details — shown so the agent can confirm this is the
+                  right event/time even when the ticket itself is rejected. */}
+              {lookup.event && (
+                <section className="flex flex-col gap-2.5 pt-4 border-t border-white/8">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-[0.8px] text-white/40">Event</h3>
+                  <div className="flex items-start gap-2 text-sm">
+                    <Icon name="Ticket" size={14} className="text-white/40 shrink-0 mt-0.5" />
+                    <span className="text-white font-semibold">{lookup.event.title}</span>
+                  </div>
+                  <div className="flex items-start gap-2 text-sm">
+                    <Icon name="MapPin" size={14} className="text-white/40 shrink-0 mt-0.5" />
+                    <span className="text-white/70">{lookup.event.venue}, {lookup.event.city}</span>
+                  </div>
+                  <div className="flex items-start gap-2 text-sm">
+                    <Icon name="Calendar" size={14} className="text-white/40 shrink-0 mt-0.5" />
+                    <span className="text-white/70">{fmtDateTime(lookup.event.date)}</span>
+                  </div>
+                </section>
               )}
             </div>
           )}
