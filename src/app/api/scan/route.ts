@@ -3,6 +3,7 @@ import { getToken } from "next-auth/jwt";
 import prisma from "../../../../prisma/client";
 import { ok, forbidden, badRequest, serverError } from "@/lib/api-utils";
 import { scanSchema } from "@/lib/validation/scan.schemas";
+import { getEventWindowStatus } from "@/lib/event-window";
 
 // ── Scan outcome discriminated union ──────────────────────────────────────
 type ScanOutcome =
@@ -10,6 +11,8 @@ type ScanOutcome =
   | { result: "ALREADY_USED"; message: string; usedAt: Date | null }
   | { result: "EXPIRED";     message: string }
   | { result: "WRONG_EVENT"; message: string }
+  | { result: "TOO_EARLY";   message: string; opensAt: Date }
+  | { result: "EVENT_ENDED"; message: string; closedAt: Date }
   | { result: "INVALID";     message: string };
 
 // ── POST /api/scan — auth required (any role) ─────────────────────────────
@@ -61,6 +64,7 @@ export async function POST(req: NextRequest) {
           where: { ticketRef, qrPayload },
           include: {
             owner: { select: { id: true, name: true } },
+            event: { select: { date: true } },
           },
         });
 
@@ -97,7 +101,48 @@ export async function POST(req: NextRequest) {
           };
         }
 
-        // ── D: Already used check ──────────────────────────────────────────
+        // ── D: Event admission window check ──────────────────────────────
+        const windowStatus = getEventWindowStatus(ticket.event.date);
+
+        if (windowStatus.state === "TOO_EARLY") {
+          await tx.scanRecord.create({
+            data: {
+              eventId,
+              agentId,
+              gate,
+              result:   "TOO_EARLY",
+              ticketId: ticket.id,
+              ticketRef,
+              note:     "Scanned before the event's admission window opens",
+            },
+          });
+          return {
+            result:  "TOO_EARLY" as const,
+            message: "Too early — gate is not open yet",
+            opensAt: windowStatus.opensAt,
+          };
+        }
+
+        if (windowStatus.state === "EVENT_ENDED") {
+          await tx.scanRecord.create({
+            data: {
+              eventId,
+              agentId,
+              gate,
+              result:   "EVENT_ENDED",
+              ticketId: ticket.id,
+              ticketRef,
+              note:     "Scanned after the event's admission window closed",
+            },
+          });
+          return {
+            result:   "EVENT_ENDED" as const,
+            message:  "Too late — the event has ended",
+            closedAt: windowStatus.closedAt,
+          };
+        }
+
+        // ── E: Already used check ──────────────────────────────────────────
         if (ticket.status === "USED") {
           await tx.scanRecord.create({
             data: {
@@ -117,7 +162,7 @@ export async function POST(req: NextRequest) {
           };
         }
 
-        // ── E: Expired check ───────────────────────────────────────────────
+        // ── F: Expired check ───────────────────────────────────────────────
         const isExpiredStatus = ticket.status === "EXPIRED";
         const isExpiredDate   =
           ticket.expiresAt != null && ticket.expiresAt < new Date();
@@ -137,7 +182,7 @@ export async function POST(req: NextRequest) {
           return { result: "EXPIRED" as const, message: "Ticket has expired" };
         }
 
-        // ── F: ADMIT ───────────────────────────────────────────────────────
+        // ── G: ADMIT ───────────────────────────────────────────────────────
         await tx.ticket.update({
           where: { id: ticket.id },
           data:  { status: "USED", usedAt: new Date() },
