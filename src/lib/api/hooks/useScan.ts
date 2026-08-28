@@ -44,6 +44,26 @@ interface ScanWrongEvent {
 }
 
 /**
+ * TOO_EARLY: scanned before the event's admission window opens.
+ * OBSERVED: { result: "TOO_EARLY", message: string, opensAt: string }
+ */
+interface ScanTooEarly {
+  result:  "TOO_EARLY";
+  message: string;
+  opensAt: string;
+}
+
+/**
+ * EVENT_ENDED: scanned after the event's admission window closed.
+ * OBSERVED: { result: "EVENT_ENDED", message: string, closedAt: string }
+ */
+interface ScanEventEnded {
+  result:   "EVENT_ENDED";
+  message:  string;
+  closedAt: string;
+}
+
+/**
  * INVALID: QR payload is malformed or ticket not found.
  * OBSERVED: { result: "INVALID", message: string }
  */
@@ -57,6 +77,8 @@ export type ScanOutcome =
   | ScanAlreadyUsed
   | ScanExpired
   | ScanWrongEvent
+  | ScanTooEarly
+  | ScanEventEnded
   | ScanInvalid;
 
 // ── Input ─────────────────────────────────────────────────────────────────────
