@@ -3,9 +3,12 @@ import { getToken } from "next-auth/jwt";
 import prisma from "../../../../../prisma/client";
 import { ok, forbidden, badRequest, serverError } from "@/lib/api-utils";
 import { lookupSchema } from "@/lib/validation/scan.schemas";
+import { getEventWindowStatus } from "@/lib/event-window";
 
 // ── Lookup outcome discriminated union — mirrors /api/scan's ScanOutcome ───
 // shape, but adds full ticket/attendee/event detail and never writes anything.
+type EventInfo = { id: string; title: string; venue: string; city: string; date: string };
+
 type LookupOutcome =
   | {
       valid: true;
@@ -18,11 +21,13 @@ type LookupOutcome =
       };
       attendee: { name: string | null; email: string | null; phone: string | null };
       booking: { ref: string; total: number; method: string };
-      event: { id: string; title: string; venue: string; city: string; date: string };
+      event: EventInfo;
     }
-  | { valid: false; result: "ALREADY_USED"; message: string; usedAt: string | null }
-  | { valid: false; result: "EXPIRED";      message: string }
+  | { valid: false; result: "ALREADY_USED"; message: string; usedAt: string | null; event: EventInfo }
+  | { valid: false; result: "EXPIRED";      message: string; event: EventInfo }
   | { valid: false; result: "WRONG_EVENT";  message: string }
+  | { valid: false; result: "TOO_EARLY";    message: string; opensAt: string;  event: EventInfo }
+  | { valid: false; result: "EVENT_ENDED";  message: string; closedAt: string; event: EventInfo }
   | { valid: false; result: "INVALID";      message: string };
 
 // ── POST /api/scan/lookup — read-only QR lookup, no mutation, no ScanRecord ─
@@ -72,12 +77,45 @@ export async function POST(req: NextRequest) {
       return ok(outcome);
     }
 
+    const event: EventInfo = {
+      id:    ticket.event.id,
+      title: ticket.event.title,
+      venue: ticket.event.venue,
+      city:  ticket.event.city,
+      date:  ticket.event.date.toISOString(),
+    };
+
+    const windowStatus = getEventWindowStatus(ticket.event.date);
+
+    if (windowStatus.state === "TOO_EARLY") {
+      const outcome: LookupOutcome = {
+        valid: false,
+        result: "TOO_EARLY",
+        message: "Too early — gate is not open yet",
+        opensAt: windowStatus.opensAt.toISOString(),
+        event,
+      };
+      return ok(outcome);
+    }
+
+    if (windowStatus.state === "EVENT_ENDED") {
+      const outcome: LookupOutcome = {
+        valid: false,
+        result: "EVENT_ENDED",
+        message: "Too late — the event has ended",
+        closedAt: windowStatus.closedAt.toISOString(),
+        event,
+      };
+      return ok(outcome);
+    }
+
     if (ticket.status === "USED") {
       const outcome: LookupOutcome = {
         valid: false,
         result: "ALREADY_USED",
         message: "Ticket has already been scanned",
         usedAt: ticket.usedAt?.toISOString() ?? null,
+        event,
       };
       return ok(outcome);
     }
@@ -85,7 +123,7 @@ export async function POST(req: NextRequest) {
     const isExpiredStatus = ticket.status === "EXPIRED";
     const isExpiredDate   = ticket.expiresAt != null && ticket.expiresAt < new Date();
     if (isExpiredStatus || isExpiredDate) {
-      const outcome: LookupOutcome = { valid: false, result: "EXPIRED", message: "Ticket has expired" };
+      const outcome: LookupOutcome = { valid: false, result: "EXPIRED", message: "Ticket has expired", event };
       return ok(outcome);
     }
 
@@ -108,13 +146,7 @@ export async function POST(req: NextRequest) {
         total:  ticket.booking.total,
         method: ticket.booking.method,
       },
-      event: {
-        id:    ticket.event.id,
-        title: ticket.event.title,
-        venue: ticket.event.venue,
-        city:  ticket.event.city,
-        date:  ticket.event.date.toISOString(),
-      },
+      event,
     };
 
     return ok(outcome);
