@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "../../../../../prisma/client";
 import { requireAdmin, unauthorized, ok, serverError } from "@/lib/api-utils";
+import { startOfDay, endOfDay } from "@/lib/event-day";
 
 // ── GET /api/admin/stats — ADMIN only ─────────────────────────────────────
 export async function GET(req: NextRequest) {
@@ -12,17 +13,42 @@ export async function GET(req: NextRequest) {
     const thirtyDaysAgo  = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
 
+    // An event is "ongoing" for its whole calendar day — derived from the
+    // date column directly so this stays correct even between cron runs.
+    const todayStart = startOfDay(now);
+    const todayEnd    = endOfDay(now);
+
     // Run all aggregate queries in parallel
     const [
       totalOrganizers,
       activeToday,
+      activeEvents,
+      totalEvents,
       ticketsAllTime,
       fraud30d,
       recentTickets,
     ] = await Promise.all([
       prisma.user.count({ where: { role: "ORGANIZER" } }),
 
-      prisma.event.count({ where: { status: "ONGOING" } }),
+      // Happening today — date-derived, not the (possibly stale) status column.
+      prisma.event.count({
+        where: {
+          status: { in: ["PUBLISHED", "ONGOING"] },
+          date:   { gte: todayStart, lte: todayEnd },
+        },
+      }),
+
+      // Active = happening today or any time in the future, and not
+      // cancelled/still a draft.
+      prisma.event.count({
+        where: {
+          status: { in: ["PUBLISHED", "ONGOING"] },
+          date:   { gte: todayStart },
+        },
+      }),
+
+      // Total = every event on the platform, regardless of status.
+      prisma.event.count(),
 
       prisma.ticket.count(),
 
@@ -61,6 +87,8 @@ export async function GET(req: NextRequest) {
     return ok({
       totalOrganizers,
       activeToday,
+      activeEvents,
+      totalEvents,
       ticketsAllTime,
       fraud30d,
       salesTrend,
