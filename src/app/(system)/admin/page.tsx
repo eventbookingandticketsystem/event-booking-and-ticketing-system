@@ -43,8 +43,8 @@ export default function AdminOverviewPage() {
           <div className="h-7 w-60 skeleton rounded mb-2" />
           <div className="h-4 w-48 skeleton rounded" />
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[0, 1, 2, 3].map((i) => (
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="bg-surface border border-border rounded-lg p-5">
               <div className="h-3 w-24 skeleton rounded mb-3" />
               <div className="h-8 w-32 skeleton rounded mb-4" />
@@ -79,13 +79,28 @@ export default function AdminOverviewPage() {
           </p>
         </div>
 
-        {/* 4 stat cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 6 stat cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <StatCard
             label="Total Organizers"
             value={String(data.organizers)}
             chipIcon={<Icon name="Building2" size={17} />}
             footText="Platform total"
+          />
+          <StatCard
+            label="Total Events"
+            value={String(data.totalEvents)}
+            chipIcon={<Icon name="CalendarRange" size={17} />}
+            footText="All statuses"
+          />
+          <StatCard
+            label="Active Events"
+            value={String(data.activeEvents)}
+            chipIcon={<Icon name="CalendarClock" size={17} />}
+            chipBg="bg-status-info-bg"
+            chipFg="text-brand-navy"
+            footDot="bg-status-info"
+            footText="Today or upcoming"
           />
           <StatCard
             label="Active Events Today"
