@@ -1,6 +1,4 @@
 // Tiketi — mock data (South Sudan / Juba context). Static, UI-only.
-// Copied VERBATIM from design-reference/.../js/data.jsx with TypeScript types applied.
-
 import type {
   EventType,
   OrgEventRow,
@@ -467,6 +465,8 @@ export const REPORT: ReportData = {
 export const ADMIN_OVERVIEW: AdminOverviewData = {
   organizers: 24,
   activeToday: 3,
+  activeEvents: 11,
+  totalEvents: 58,
   ticketsAllTime: 14820,
   fraud30d: 47,
   salesTrend: [
