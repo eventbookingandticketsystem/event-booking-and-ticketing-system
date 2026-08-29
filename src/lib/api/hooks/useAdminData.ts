@@ -44,6 +44,8 @@ export function adaptAdminStats(s: ApiAdminStats): AdminOverviewData {
   return {
     organizers:    s.totalOrganizers,
     activeToday:   s.activeToday,
+    activeEvents:  s.activeEvents,
+    totalEvents:   s.totalEvents,
     ticketsAllTime: s.ticketsAllTime,
     fraud30d:      s.fraud30d,
     salesTrend:    s.salesTrend,
