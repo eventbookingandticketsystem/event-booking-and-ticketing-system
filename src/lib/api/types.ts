@@ -340,6 +340,8 @@ export interface ApiUpdatedUser {
 export interface ApiAdminStats {
   totalOrganizers: number;
   activeToday:     number;   // events with status ONGOING right now
+  activeEvents:    number;   // published/ongoing events today or in the future
+  totalEvents:     number;   // every event on the platform, any status
   ticketsAllTime:  number;
   fraud30d:        number;   // rejected scans in last 30 days
   salesTrend:      Array<{ t: string; v: number }>;  // last 14 days, "Jun 05" → count
