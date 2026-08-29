@@ -47,6 +47,8 @@ export interface ActivityRecord {
 export interface AdminOverviewData {
   organizers: number;
   activeToday: number;
+  activeEvents: number;
+  totalEvents: number;
   ticketsAllTime: number;
   fraud30d: number;
   salesTrend: Array<{ t: string; v: number }>;
